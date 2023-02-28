@@ -1,0 +1,3688 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 14.0
+-- Dumped by pg_dump version 14.0
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: data; Type: SCHEMA; Schema: -; Owner: postgres
+--
+
+CREATE SCHEMA data;
+
+
+ALTER SCHEMA data OWNER TO postgres;
+
+--
+-- Name: etl; Type: SCHEMA; Schema: -; Owner: postgres
+--
+
+CREATE SCHEMA etl;
+
+
+ALTER SCHEMA etl OWNER TO postgres;
+
+--
+-- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
+
+
+--
+-- Name: clean_backlink(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.clean_backlink()
+    LANGUAGE plpgsql
+    AS $$
+Declare
+	exitingrow int;
+	r record;
+Begin
+	for r in (select ctid, * from etl.default_vps_backlink
+					where etl = 0 ) loop
+		insert into etl.clean_vps_backlink values (
+			r.month, r.vps::numeric, r.backlink::numeric, r.vps_tien_dat::numeric, r.vps_tien_go::numeric
+			, r.vps_tien_dat_gop::numeric, r.vps_tien_go_gop::numeric, r.backlink_tien_dat::numeric,
+			r.backlink_tien_go::numeric, r.backlink_tien_dat_gop::numeric, r.backlink_tien_go_gop::numeric,0
+			, r.id, r.updatetime
+		);
+		update etl.default_vps_backlink set etl = 1 where id = r.id;
+	end loop;
+End;
+$$;
+
+
+ALTER PROCEDURE etl.clean_backlink() OWNER TO postgres;
+
+--
+-- Name: clean_creater(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.clean_creater()
+    LANGUAGE plpgsql
+    AS $$
+Declare
+	nlrecord record;
+Begin
+	for nlrecord in (select ctid, * from etl.default_creater
+					where etl = 0 ) loop
+		insert into etl.clean_creater values (
+			nlrecord.id
+			, nlrecord."ID người làm"
+			, To_timestamp(nlrecord.updated_at, 'MM-DD-YYY HH24:MI:SS')::timestamp without time zone
+			, nlrecord."ID"
+			, nlrecord."Mã HR"
+			, nlrecord."Họ tên"
+			, nlrecord."Mã hóa"
+			, nlrecord."Email"
+			, nlrecord."Năm sinh"
+			, nlrecord."Nơi đang học"
+			, nlrecord."Điểm viết Ielts hoặc tương đương"
+			, nlrecord."Lĩnh vực"
+			, nlrecord."STK"
+			, nlrecord."Ngân hàng"
+			, nlrecord."CV/bảng điểm + sample"
+			, nlrecord."Tình trạng"
+			, nlrecord."Đánh giá"
+			, nlrecord."Ghi chú"
+			, 0
+		);
+		update etl.default_creater set etl = 1 where id = nlrecord.id and ctid = nlrecord.ctid;
+	end loop;
+end;
+$$;
+
+
+ALTER PROCEDURE etl.clean_creater() OWNER TO postgres;
+
+--
+-- Name: clean_creater2(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.clean_creater2()
+    LANGUAGE plpgsql
+    AS $$
+Declare
+	nlrecord record;
+Begin
+	for nlrecord in (select ctid, * from etl.default_creaters2
+					where etl = 0 ) loop
+		insert into etl.clean_creaters2 values (
+			case when nlrecord.created_at = '' or nlrecord.created_at is null then null else 
+			To_timestamp(nlrecord.created_at, 'MM-DD-YYY HH24:MI:SS')::timestamp without time zone end
+			,nlrecord.hr
+			, nlrecord.short_name
+			, nlrecord.name
+			, nlrecord.phone
+			, nlrecord.study_at
+			, nlrecord.ielts_score
+			, nlrecord.fields
+			, nlrecord.cv
+			, nlrecord.esay
+			, nlrecord.hours_active
+			, nlrecord.hours_note
+			, nlrecord.note
+			, nlrecord.check_status
+			, nlrecord.status
+			, case when nlrecord.updated_at = '' or nlrecord.updated_at is null then null 
+			else To_timestamp(nlrecord.updated_at, 'MM-DD-YYY HH24:MI:SS')::timestamp without time zone end
+			,  nlrecord.long_name
+			, nlrecord.id
+			, 0
+			, nlrecord.db_id
+		);
+		update etl.default_creaters2 set etl = 1 where id = nlrecord.id and ctid = nlrecord.ctid;
+	end loop;
+end;
+$$;
+
+
+ALTER PROCEDURE etl.clean_creater2() OWNER TO postgres;
+
+--
+-- Name: clean_customer(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.clean_customer()
+    LANGUAGE plpgsql
+    AS $$
+Declare
+	khrecord record;
+Begin
+	for khrecord in (select ctid, * from etl.default_customer
+					where etl = 0 ) loop
+		insert into etl.clean_customer values (
+			khrecord.id 
+			,khrecord."ID khách"
+			,case when khrecord."Ngày nhập" like '______' then To_Date(khrecord."Ngày nhập", 'YYYYMM')
+				when khrecord."Ngày nhập" like '%.%' then Date('1899-12-30') + floor(CAST(khrecord."Ngày nhập" as real))::int
+				else null
+			end 
+			, To_timestamp(khrecord.updated_at, 'MM-DD-YYY HH24:MI:SS')::timestamp without time zone
+			, khrecord."Mã nhân viên chốt"
+			,khrecord."Tên Họ" 
+			,khrecord."Mail1" 
+			, khrecord."Mail2" 
+			,khrecord."Mail3" 
+			, khrecord."Trình độ"
+			, khrecord."Nguồn"
+			, khrecord."Quốc gia"
+			, khrecord."Note" 
+			, khrecord."Mã khách hàng cũ" 
+			, 0 
+		);
+		update etl.default_customer set etl = 1 where id = khrecord.id and ctid = khrecord.ctid;
+	end loop;
+end;
+$$;
+
+
+ALTER PROCEDURE etl.clean_customer() OWNER TO postgres;
+
+--
+-- Name: clean_deadline(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.clean_deadline()
+    LANGUAGE plpgsql
+    AS $$
+Declare
+	dlrecord record;
+	dl_split text[];
+	hours text;
+	year_num text;
+	apm text;
+	days text;
+	timezone text;
+	deadline_final timestamp without time zone;
+Begin
+	for dlrecord in (select id, order_id, created_at, updated_at, deadline, ctid 
+					 from etl.clean_orders
+					where etl= 1 ) loop
+		year_num:= extract(YEAR from dlrecord.created_at);
+		--raise notice 'Value: %', year_num;
+		if dlrecord.deadline is null or dlrecord.deadline = '' or dlrecord.deadline like 'ht%' then
+			deadline_final :=null;
+		else
+			dl_split := string_to_array(lower(regexp_replace(dlrecord.deadline, E'[\n\r]+', ' ', 'g' )) , ' ');
+			--raise notice 'Value: %', dl_split;
+			for i in array_lower(dl_split,1)..array_upper(dl_split,1) loop
+				--raise notice 'Value: %', dl_split[i];
+				--raise notice 'Value: %', dl_split[i] like '%:__%';
+				--get hours
+				if hours is not null and apm is not null and days is not null and timezone is not null then
+					exit;
+				elseif (dl_split[i] like '%:__%' or dl_split[i] like '%h') and hours is null then
+					hours := dl_split[i];
+					--raise notice 'Value: %', hours;
+					if hours like '%-%' then hours:= split_part(hours, '-',1);
+					elsif hours like '%h%' then hours:= replace(hours, 'h',':00');
+					elsif hours like '%0059' then hours := replace(hours, '0059','00');
+					elsif hours like '%/_' and hours not like '%/%/%' then hours:= concat(hours, '/',year_num);
+					elsif hours like '24:%' then hours:= replace(hours, '24:', '00:');
+					else hours:=hours;
+					end if;
+				-- get apm
+				elsif dl_split[i] like 'am' or dl_split[i] like 'pm' and apm is null then
+					apm := dl_split[i];
+					if hours like '%m%' then apm:=null;
+					else apm:=apm;
+					end if;
+				--get days
+				elsif dl_split[i] like '%/%' and days is null then days:= dl_split[i];
+					if hours like '%/%' then days:=null;
+					elsif days like '%-%' then days := concat(split_part(days,'-',1),'/',year_num);
+					elsif days like '%/____' or days is null then days:=days;
+					else days:= concat(days, '/',year_num);
+					end if;
+				--raise notice 'Value: %', days;
+
+				-- get timezone
+				elsif lower(dl_split[i]) in (select locate from etl.clean_timezone) then
+					timezone := dl_split[i];
+				end if;
+			end loop;
+			if timezone is null then timezone:= 'vnt';
+			end if;
+			raise notice 'Value: %', hours;
+			raise notice 'Value: %', apm;
+			raise notice 'Value: %', days;
+			days := replace(days, ':','');
+			days := replace(days, '.','');
+			days := replace(days, ',','');
+			days := replace(days, '//','/');
+			hours:= replace(hours,',','');
+			if split_part(days,'/',2)::numeric >12 then days:=null;
+			elsif days not like '%/%/%' then days:=concat(days, '/',year_num);
+				end if;
+			-- get deadline
+			--if hours like '%/%' then days:=null;
+			--end if;
+			If (hours like '%:__/%' or hours like '%c:%' or hours like '_')then hours:=null; end if;
+			
+			if (hours like '%m%' or apm like '_m%') and hours is not null and hours not like '%:%:%' then 
+				if (split_part(hours,':',1)::numeric >12 or hours = '') then
+					hours = concat((split_part(hours,':',1)::numeric -12)::text,':',(split_part(hours,':',2)));
+				end if;
+				deadline_final :=To_timestamp(concat(hours,apm,days), 'HH:MIamDD/MM/YYYY')::timestamp without time zone;
+			elsif days like '%/%/%' and days not like '%/___%/%'and hours not like '%:%:%' 
+				and (split_part(hours,':',2)::numeric <60 or hours::numeric <24) and (split_part(hours,':',1)::numeric <24 or hours = '') then 
+				deadline_final := To_timestamp(concat(hours,apm,' ',days), 'HH24:MI DD/MM/YYYY')::timestamp without time zone;
+			elsif hours like '00:00%' then 
+				deadline_final := To_timestamp(concat(hours,apm,' ',days), 'HH24:MI DD/MM/YYYY')::timestamp without time zone + interval '1'day;
+			elsif hours is null and days is not null then 
+				deadline_final := To_timestamp(days, 'DD/MM/YYYY') ::timestamp without time zone + interval '1'day;
+			else deadline_final := null;
+			end if;
+			--raise notice 'Value: %', deadline_final;
+		end if;
+		insert into etl.clean_deadline values(
+			dlrecord.id, dlrecord.order_id, dlrecord.updated_at
+			,deadline_final, timezone,0);
+		hours:= null; apm:= null; days := null; timezone := null;
+		update etl.clean_orders set etl=2 where id = dlrecord.id and ctid = dlrecord.ctid;
+	end loop;
+End;
+$$;
+
+
+ALTER PROCEDURE etl.clean_deadline() OWNER TO postgres;
+
+--
+-- Name: clean_orders(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.clean_orders()
+    LANGUAGE plpgsql
+    AS $$
+Declare
+	dsdrecord record;
+Begin
+	for dsdrecord in (select ctid,* from etl.default_order
+					where etl = 0 ) loop
+		insert into etl.clean_orders values (
+			dsdrecord.id
+			, dsdrecord."Mã đơn" 
+			, case when dsdrecord."Mã đơn bố"='' then dsdrecord."Mã đơn" else dsdrecord."Mã đơn bố" end
+			, case when dsdrecord."Ngày nhập" = '' and dsdrecord."Mã đơn bố" <>'' 
+					then (select TO_Timestamp(max("Ngày nhập") , 'MM-DD-YY HH24:MI:SS')::timestamp without time zone													
+						from etl.default_order
+						where "Mã đơn bố" = dsdrecord."Mã đơn bố")
+				when dsdrecord."Ngày nhập" = '' or dsdrecord."Ngày nhập" like '%/1899%' then null
+				when dsdrecord."Ngày nhập" like '%/%' then TO_Timestamp(dsdrecord."Ngày nhập", 'MM/DD/YY HH24:MI:SS')::timestamp without time zone
+				when dsdrecord."Ngày nhập" like '%-%-%' then TO_Timestamp(dsdrecord."Ngày nhập", 'Mon-DD-YY HH24:MI')::timestamp without time zone
+				else null end
+			, To_Timestamp(dsdrecord."updated_at", 'MM/DD/YYYY HH24:MI:SS') ::timestamp without time zone 
+			,case when dsdrecord."ID khách" = '' and dsdrecord."Mã đơn bố" <>'' then (select max("ID khách") from etl.default_order
+																			 where "Mã đơn bố" = dsdrecord."Mã đơn bố")
+				else dsdrecord."ID khách" end 
+			--, dsdrecord."ID khách"
+			, dsdrecord.col_1
+			, dsdrecord.col_2
+			,case when dsdrecord."Mail khách hàng" = '' and dsdrecord."Mã đơn bố" <>'' then (select max("Mail khách hàng") from etl.default_order
+																			 where "Mã đơn bố" = dsdrecord."Mã đơn bố")
+				else dsdrecord."Mail khách hàng" end
+			,case when dsdrecord."Mã người chốt" = '' and dsdrecord."Mã đơn bố" <>'' then (select max("Mã người chốt") from etl.default_order
+																			 where "Mã đơn bố" = dsdrecord."Mã đơn bố")
+				else dsdrecord."Mã người chốt" end
+			--, dsdrecord."Mail khách hàng"
+			--, dsdrecord."Mã người chốt"
+			, dsdrecord.col_3
+			, dsdrecord.col_4
+			, dsdrecord."Trình độ"
+			, dsdrecord."Loại bài tập" 
+			, dsdrecord."Môn" 
+			, dsdrecord."Đề bài"
+			, dsdrecord."Deadline"
+			, case when dsdrecord."Giá trị đơn hàng" like '%C%' or dsdrecord."Giá trị đơn hàng" like '%.%.%' or dsdrecord."Giá trị đơn hàng" like '%U%' 
+					or dsdrecord."Giá trị đơn hàng" like '%+%' or dsdrecord."Giá trị đơn hàng" like '% %' or dsdrecord."Giá trị đơn hàng" like '%S%' 
+					then 0::real
+				else Nullif(replace(dsdrecord."Giá trị đơn hàng",',',''),'')::real end
+			, dsdrecord."Đơn vị (đơn hàng)"
+			, case when dsdrecord."Giảm giá" like 'K%' or dsdrecord."Giảm giá" like '%re%'or dsdrecord."Giảm giá" like '%,%' or dsdrecord."Giảm giá" like '%(%' or dsdrecord."Giảm giá" like '%g%'  then 0::numeric
+				else Nullif(split_part(dsdrecord."Giảm giá", '%', 1),''):: numeric end
+			, case when dsdrecord."Giảm giá" like 'K%' or dsdrecord."Giảm giá" like '%,%' or dsdrecord."Giảm giá" like '%re%' or dsdrecord."Giảm giá" like '%(%' or dsdrecord."Giảm giá" like '%g%' then 0::real
+				when dsdrecord."Giá trị đơn hàng" like '%C%' or dsdrecord."Giá trị đơn hàng" like '%.%.%' or dsdrecord."Giá trị đơn hàng" like '% %' then 0 
+				else Nullif(split_part(dsdrecord."Giảm giá", '%', 1),''):: numeric * Nullif(replace(dsdrecord."Giá trị đơn hàng",',',''),'')::numeric
+			/(100 - Nullif(split_part(dsdrecord."Giảm giá", '%', 1),''):: numeric) end
+			, Case when dsdrecord."Đã thanh toán" like 'U%' or dsdrecord."Đã thanh toán" like 'K%' or dsdrecord."Đã thanh toán" like 'C%' or dsdrecord."Đã thanh toán" like 'c%'
+					or dsdrecord."Đã thanh toán" like '%+%' or dsdrecord."Đã thanh toán" like '%-%' or dsdrecord."Đã thanh toán" like '%(%' or dsdrecord."Đã thanh toán" like '%AD%' then null
+				else Nullif(split_part(replace(dsdrecord."Đã thanh toán",',',''),' ',1),'')::numeric
+					end
+			, Case when dsdrecord."Đã thanh toán" like 'U%' or dsdrecord."Đã thanh toán" like 'K%' or dsdrecord."Đã thanh toán" like 'C%' or dsdrecord."Đã thanh toán" like 'c%' then dsdrecord."Đã thanh toán"
+				else null end
+			, dsdrecord."Trans ID"
+			, dsdrecord."Tài khoản thanh toán"
+			, dsdrecord."Ghi chú khác" 
+			, case when dsdrecord."Mã HR" like 'HR%' then dsdrecord."Mã HR"
+					when dsdrecord."Mã người làm" <> 'Không tìm được UV' then Split_part(dsdrecord."Mã người làm", '/', 3) 
+					when dsdrecord."Mã người làm" = 'Không tìm được UV' then ''
+					when Split_part(dsdrecord."Mã người làm", '/', 3) = '' then dsdrecord."Mã người làm"
+					else dsdrecord."Mã người làm"
+					end
+			, case when dsdrecord."Mã người làm" = 'Không tìm được UV' 
+						or dsdrecord."Mã người làm" like '%hr%' 
+						or dsdrecord."Mã người làm" = 'Người nhà'
+						or dsdrecord."Mã người làm" like 'HR%'
+						or dsdrecord."Mã người làm" like 'Hr%'
+					then '' 
+					else Split_part(dsdrecord."Mã người làm", '/', 1) 
+					end 
+			, case when dsdrecord."Tiền trả ứng viên" like '%a%' OR dsdrecord."Tiền trả ứng viên" like '% %' then null::numeric
+					when (dsdrecord."Đơn vị (trả ứng viên)" = 'VND' or dsdrecord."Đơn vị (trả ứng viên)" = '') 
+					and dsdrecord."Tiền trả ứng viên" not like '%(%' 
+						then nullif(replace(dsdrecord."Tiền trả ứng viên",'k',''), '') ::numeric *1000 
+					else nullif(replace(dsdrecord."Tiền trả ứng viên",'k',''), '') ::numeric
+					end 
+			, dsdrecord."Đơn vị (trả ứng viên)"
+			, Nullif(replace(dsdrecord."Dự kiến trả ứng viên",',',''),'')::numeric
+			, dsdrecord."Tình trạng đơn"
+			, dsdrecord.col_6
+			, dsdrecord.col_7
+			, dsdrecord.col_8
+			, dsdrecord."Gửi check"
+			, case when dsdrecord."%refund" like '%re%' or dsdrecord."%refund" like '%đ%' or dsdrecord."%refund" like '%S%' or dsdrecord."%refund" like '%(%' then 0
+					when Nullif(replace(dsdrecord."%refund", '%', ''),''):: numeric <= 100 
+						then Nullif(replace(dsdrecord."%refund", '%', ''),''):: numeric
+					else Nullif(replace(dsdrecord."%refund", '%', ''),''):: numeric/100
+					end
+			, case when dsdrecord."%refund" like '%re%' or dsdrecord."%refund" like '%đ%' or dsdrecord."%refund" like '%S%' or dsdrecord."%refund" like '%(%' then null
+				when dsdrecord."Giá trị đơn hàng" like '%C%' or dsdrecord."Giá trị đơn hàng" like '%.%.%' 
+					or dsdrecord."Giá trị đơn hàng" like '% %' or dsdrecord."%refund" like '%(%' then 0 
+				when Nullif(replace(dsdrecord."%refund", '%', ''),''):: numeric <= 100 
+						then Nullif(replace(dsdrecord."%refund", '%', ''),''):: numeric * Nullif(replace(dsdrecord."Giá trị đơn hàng",',',''),'')::real /100
+					else Nullif(replace(dsdrecord."%refund", '%', ''),''):: numeric/100 * Nullif(replace(dsdrecord."Giá trị đơn hàng",',',''),'')::real /100
+					end
+			, dsdrecord."Đơn vị refund"
+			, dsdrecord."Lý do refund"
+			, Nullif(replace(replace(dsdrecord."Tip",',',''),' ',''),'')::numeric
+			, dsdrecord."Đơn vị tip"
+			, dsdrecord.col_9
+			, dsdrecord.col_10
+			, dsdrecord.col_11
+			, dsdrecord."Tình trạng thanh toán"
+			,  case when dsdrecord."Ngày giờ xong" = '12/30/1899 0:00:00' or dsdrecord."Ngày giờ xong" = ''  or dsdrecord."Ngày giờ xong" = '0' then null
+					else To_Timestamp(dsdrecord."Ngày giờ xong", 'MM/DD/YYYY H24:MI:SS') ::timestamp without time zone
+					end 
+			, dsdrecord."Note"
+			, 0 
+		);
+	update etl.default_order set etl = 1 where id = dsdrecord.id and ctid = dsdrecord.ctid; 
+	end loop;
+end;
+$$;
+
+
+ALTER PROCEDURE etl.clean_orders() OWNER TO postgres;
+
+--
+-- Name: clean_petty_expenses(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.clean_petty_expenses()
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+	re record;
+	ro int;
+Begin
+	for re in (select ctid, * from etl.default_petty_expenses where etl = 0) loop
+		insert into etl.clean_petty_expenses values(
+			re.clv_id
+			, re.month
+			, To_timestamp(re.payment_at, 'Mon DD, YYYY')::timestamp without time zone
+				--else  To_timestamp(re.payment_at, 'Mon DD, YYYY')::timestamp without time zone end
+			, case when re.accounting_at <>'' then To_timestamp(re.accounting_at, 'Mon DD, YYYY')::timestamp without time zone
+				else  To_timestamp(re.payment_at, 'Mon D, YYYY')::timestamp without time zone end
+			, re.month_cover::numeric
+			, re.payment_by
+			, case when re.spend = '' then null::numeric else replace(re.spend, ',','')::numeric end
+			, case when re.collect = '' then null::numeric else replace(re.collect, ',','')::numeric end
+			, 'VND'
+			, re.detail, re.type, re.category, re.payment_id, re.backup, re.source
+			, 0
+			, re.id
+		);
+		update etl.default_petty_expenses set etl = 1 where id = re.id and ctid = re.ctid;
+	end loop;
+end;$$;
+
+
+ALTER PROCEDURE etl.clean_petty_expenses() OWNER TO postgres;
+
+--
+-- Name: clean_salary(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.clean_salary()
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+	r record;
+BEGIN
+	FOR r in ( Select * from etl.default_salary where etl = 0) loop
+		Insert into etl.clean_salary values (
+			  r.month , r.stt , r.id , r.name ,r.position , r.department , r.stk , r.bank 
+			  , case when r.num_working_day = '' then null:: numeric else replace(r.num_working_day,',','') ::numeric end --as num_working_day
+			  , case when r.num_working_day_standard = '' then null:: numeric else replace(r.num_working_day_standard,',','') ::numeric end -- as num_working_day_standard
+			  , case when r.sales_salary = '' then null:: numeric else replace(r.sales_salary,',','') ::numeric end --as sales_salary
+			  , case when r.ot_salary = '' then null:: numeric else replace(r.ot_salary,',','') ::numeric end --as ot_salary
+			  , case when r.advance_salary = '' then null:: numeric else replace(r.advance_salary,',','') ::numeric end --as advance_salary
+			  , case when r.fines = '' then null:: numeric else replace(r.fines,',','') ::numeric end --as fines
+			  , case when r.bonus = '' then null:: numeric else replace(r.bonus,',','') ::numeric end --as bonus
+			  , case when r.basic_salary = '' then null:: numeric else replace(r.basic_salary,',','') ::numeric end --as basic_salary
+			  , case when r.allowance = '' then null:: numeric else replace(r.allowance,',','') ::numeric end --as allowance
+			  , case when r.hard_salary = '' then null:: numeric else replace(r.hard_salary,',','') ::numeric end --as hard_salary
+			  , case when r.time_salary = '' then null:: numeric else replace(r.time_salary,',','') ::numeric end --as time_salary
+			  , case when r.final_salary = '' then null:: numeric else replace(r.final_salary,',','') ::numeric end --as final_salary
+			  , r.backup,0, r.gen_id , r.updated_time );
+		update etl.default_salary set etl = 1 where gen_id = r.gen_id;
+	end loop;
+END;
+$$;
+
+
+ALTER PROCEDURE etl.clean_salary() OWNER TO postgres;
+
+--
+-- Name: clean_transaction(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.clean_transaction()
+    LANGUAGE plpgsql
+    AS $$
+declare
+	ro int;
+	r record;
+begin
+	for r in (select ctid, * from etl.default_transaction where etl = 0) loop
+		insert into etl.clean_transaction values(
+		r.default_id
+		, r.id
+		, To_Timestamp(r.created_at, 'DD/MM/YYYY')::timestamp without time zone
+		, To_Timestamp(r.updated_at, 'MM/DD/YYYY HH24:MI:SS') ::timestamp without time zone
+		, r.order_parent_id
+		, r.transaction_id
+		,  case when r.total_amount = '' then null else replace(r.total_amount, ',','')::numeric end
+		, r.payment_currency
+		, case when r.transaction_cost = '' then null else replace(r.transaction_cost, ',','')::numeric end 
+		, r.cost_currency
+		, case when r.payment_methods = '#N/A' then null else r.payment_methods end 
+		, r.payment_account
+		, r.payment_type
+		,r.col1
+		,r.col2
+		,r.col3
+		, r.note
+		,0);
+		update etl.default_transaction set etl = 1 where ctid = r.ctid and default_id = r.default_id;
+	end loop;
+end;
+$$;
+
+
+ALTER PROCEDURE etl.clean_transaction() OWNER TO postgres;
+
+--
+-- Name: customer_types(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.customer_types()
+    LANGUAGE plpgsql
+    AS $$
+declare 
+	start_month text;
+	total_month numeric;
+	month_used numeric;
+	customer_type text;
+	amount numeric;
+	r record;
+	ro numeric;
+begin
+	for r in (select order_id, month, created_at, customer_id, total_amount, paid_amount, is_payment
+			 from data.orderdetails where etl = 0) loop
+		select min(month) into start_month from data.orderdetails where customer_id = r.customer_id and month <=r.month;
+		total_month := (split_part(r.month, '/'::text, 1)::numeric 
+							- split_part(min(start_month), '/'::text, 1)::numeric) * 12::numeric 
+						+ (split_part(r.month, '/'::text, 2)::numeric 
+							- split_part(min(start_month), '/'::text, 2)::numeric + 1::numeric);
+		select distinct(month) into month_used from data.orderdetails where customer_id = r.customer_id and month <= r.month;
+		select sum(paid_amount) into amount from data.orderdetails where customer_id = r.customer_id and month <= r.month;
+		
+		if start_month = r.month then
+			if amount >0 or r.is_payment = 'Unpaid (vẫn làm)' then
+				customer_type = '2. Khách mới';
+			else 
+				customer_type = '6. Khách để miss';
+			end if;
+		else
+			if total_amount >= 3 and month_used/total_amount >0.8 then
+				customer_type = '4. Khách hàng trung thành';
+			else 
+				customer_type = '5. Khách hàng quay lại khác';
+			end if;
+        end if;
+		
+		with updat as (update data.customer_types set cus_type = customer_type
+						where customer_id = r.customer_id and month = r.month
+						returning 1)
+		select count(*) into ro from updat;
+		
+		if ro = 0 then
+			insert into data.customer_types values(r.customer_id, r.month, customer_type);
+		end if;
+		
+		update data.orderdetails set etl = 1 where order_id = r.order_id;
+	end loop;
+end;
+$$;
+
+
+ALTER PROCEDURE etl.customer_types() OWNER TO postgres;
+
+--
+-- Name: data_backlink(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.data_backlink()
+    LANGUAGE plpgsql
+    AS $$
+Declare
+	exitingrow int;
+	r record;
+Begin
+for r in (select ctid, * from etl.clean_vps_backlink
+					 where etl = 0) loop
+		with updatestatement as(
+			update data.vps_backlink set 
+				vps = r.vps, backlink = r.backlink, vps_tien_dat = r.vps_tien_dat, vps_tien_go = r.vps_tien_go
+				, vps_tien_dat_gop = r.vps_tien_dat_gop, vps_tien_go_gop = r.vps_tien_go_gop
+				, backlink_tien_dat = r.backlink_tien_dat, backlink_tien_go = r.backlink_tien_go
+				, backlink_tien_dat_gop = r.backlink_tien_dat_gop, backlink_tien_go_gop = r.backlink_tien_go_gop
+				, id = r.id, updatetime = r.updatetime
+			where month = r.month
+			returning 1
+		)
+		select count(*) into exitingrow from updatestatement;
+		if exitingrow = 0 then
+			insert into data.vps_backlink values(
+				r.month, r.vps,r.backlink,r.vps_tien_dat,r.vps_tien_go,r.vps_tien_dat_gop, r.vps_tien_go_gop
+				, r.backlink_tien_dat, r.backlink_tien_go, r.backlink_tien_dat_gop, r.backlink_tien_go_gop, r.id, r.updatetime
+			);
+		end if;
+		update etl.clean_vps_backlink set etl=1 where id = r.id;
+	end loop;
+End;
+$$;
+
+
+ALTER PROCEDURE etl.data_backlink() OWNER TO postgres;
+
+--
+-- Name: data_creater(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.data_creater()
+    LANGUAGE plpgsql
+    AS $$
+Declare
+	exitingrow int;
+	nlrecord record;
+begin
+	for nlrecord in (select  * from etl.clean_creater where etl = 0) loop
+		with updatestatement as(
+			Update data.creaters set id = nlrecord.id
+				, updated_at = nlrecord.updated_at
+				, creater_short_name = nlrecord.creater_short_name
+				, hr_id = nlrecord.hr_id
+				, creater_name = nlrecord.creater_name
+				, creater_long_name = nlrecord.creater_long_name
+				, creater_email = nlrecord.creater_email
+				, creater_year = nlrecord.creater_year
+				, study_at = nlrecord.study_at
+				, ielts_writing_score = nlrecord.ielts_writing_score
+				, creater_feild = nlrecord.creater_feild
+				, creater_bank_account = nlrecord.creater_bank_account
+				, creater_bank = nlrecord.creater_bank
+				, cv_link = nlrecord.cv_link
+				, creater_status = nlrecord.creater_status
+				, creater_evaluate = nlrecord.creater_evaluate
+				, note = nlrecord.note
+			where creater_id = nlrecord.creater_id
+			returning 1
+		)
+		select count(*) into exitingrow from updatestatement;
+		if (exitingrow = 0) then
+			insert into data.creaters
+			 values (nlrecord.id,nlrecord.creater_id,nlrecord.updated_at,nlrecord.creater_short_name,nlrecord.hr_id,nlrecord.creater_name,nlrecord.creater_long_name
+					,nlrecord.creater_email,nlrecord.creater_year,nlrecord.study_at,nlrecord.ielts_writing_score,nlrecord.creater_feild,nlrecord.creater_bank_account
+					, nlrecord.creater_bank,nlrecord.cv_link,nlrecord.creater_status,nlrecord.creater_evaluate,nlrecord.note);
+		end if;
+		update etl.clean_creater set etl = 1 where id = nlrecord.id;
+	end loop;
+end; 
+$$;
+
+
+ALTER PROCEDURE etl.data_creater() OWNER TO postgres;
+
+--
+-- Name: data_creaters2(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.data_creaters2()
+    LANGUAGE plpgsql
+    AS $$
+Declare
+	exitingrow int;
+	nlrecord record;
+begin
+	for nlrecord in (select  * from etl.clean_creaters2 where etl = 0) loop
+		with updatestatement as(
+			Update data.creaters2 set 
+				created_at = nlrecord.created_at
+				, hr = nlrecord.hr, short_name = nlrecord.short_name, name = nlrecord.name, phone = nlrecord.phone
+				, study_at = nlrecord.study_at, ielts_score = nlrecord.ielts_score, fields = nlrecord.fields, cv= nlrecord.cv
+				, esay = nlrecord.esay, hours_active = nlrecord.hours_active, hours_note = nlrecord.hours_note
+				, note = nlrecord.note, check_status = nlrecord.check_status, status = nlrecord.status, updated_at = nlrecord.updated_at
+				,long_name =nlrecord.long_name, db_id = nlrecord.db_id
+			where id = nlrecord.id
+			returning 1
+		)
+		select count(*) into exitingrow from updatestatement;
+		if (exitingrow = 0) then
+			insert into data.creaters2
+			 values (nlrecord.created_at,nlrecord.hr,nlrecord.short_name, nlrecord.name, nlrecord.phone, nlrecord.study_at, nlrecord.ielts_score
+					, nlrecord.fields, nlrecord.cv, nlrecord.esay, nlrecord.hours_active,nlrecord.hours_note, nlrecord.note
+					, nlrecord.check_status, nlrecord.status, nlrecord.updated_at, nlrecord.long_name, nlrecord.id, nlrecord.db_id);
+		end if;
+		update etl.clean_creaters2 set etl = 1 where id = nlrecord.id;
+	end loop;
+end; 
+$$;
+
+
+ALTER PROCEDURE etl.data_creaters2() OWNER TO postgres;
+
+--
+-- Name: data_customer(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.data_customer()
+    LANGUAGE plpgsql
+    AS $$
+Declare
+	exitingrow int;
+	khrecord record;
+begin
+	for khrecord in (select  ctid, * from etl.clean_customer where etl = 0) loop
+		with updatestatement as(
+			Update data.customers set id = khrecord.id
+				, created_at = khrecord.created_at
+				, updated_at = khrecord.updated_at
+				, created_by = khrecord.created_by
+				, customer_name = khrecord.customer_name
+				, customer_mail1 = khrecord.customer_mail1
+				, customer_mail2 = khrecord.customer_mail2
+				, customer_mail3 = khrecord.customer_mail3
+				, customer_level = khrecord.customer_level
+				, source = khrecord.source
+				, customer_country = khrecord.customer_country
+				, note = khrecord.note
+				, customer_old_id = khrecord.customer_old_id
+			where customer_id = khrecord.customer_id
+			returning 1
+		)
+		select count(*) into exitingrow from updatestatement;
+		if (exitingrow = 0) then
+			insert into data.customers
+			 values (khrecord.id,khrecord.customer_id,khrecord.created_at,khrecord.updated_at
+					 ,khrecord.created_by,khrecord.customer_name,khrecord.customer_mail1
+					 ,khrecord.customer_mail2,khrecord.customer_mail3,khrecord.customer_level, khrecord.source
+					 ,khrecord.customer_country,khrecord.note,khrecord.customer_old_id);
+		end if;
+		update data.orderdetails set customer_source = khrecord.source, customer_mail1 = khrecord.customer_mail1 
+		where customer_id = khrecord.customer_id;
+		update etl.clean_customer set etl = 1 where id = khrecord.id and ctid = khrecord.ctid;
+	end loop;
+end;
+$$;
+
+
+ALTER PROCEDURE etl.data_customer() OWNER TO postgres;
+
+--
+-- Name: data_deadline(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.data_deadline()
+    LANGUAGE plpgsql
+    AS $$
+Declare
+	exitingrow int;
+	dlrecord record;
+Begin
+	for dlrecord in (select d.ctid, * from etl.clean_deadline d 
+					 left join etl.clean_timezone ti on d.timezone = ti.locate
+					 where etl = 0) loop
+		with updatestatement as(
+			update data.orders set deadline = dlrecord.deadline + interval '1' day * dlrecord.num, etl = 0
+			where order_id = dlrecord.order_id
+			returning 1
+		)
+		select count(*) into exitingrow from updatestatement;
+		if exitingrow = 0 then
+			insert into data.orders(order_id, deadline, elt) values(dlrecord.order_id,dlrecord.deadline+interval '1' day * dlrecord.num,0);
+		end if;
+		update etl.clean_deadline set etl=1 where id = dlrecord.id and ctid = dlrecord.ctid;
+	end loop;
+End;
+$$;
+
+
+ALTER PROCEDURE etl.data_deadline() OWNER TO postgres;
+
+--
+-- Name: data_orderdetail(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.data_orderdetail()
+    LANGUAGE plpgsql
+    AS $$
+declare
+	exitingrow int;
+	orecord record;
+	previuos_updatetime timestamp;
+begin
+	--select last_updated into previuos_updatetime from data.etljob where task_name = 'order_detail';
+	for orecord in (
+		select o.order_id
+		, case when o.order_parent_id <>'' then o.order_parent_id else o.order_id end as order_parent_id
+		, case when o.created_at is null then concat(TO_CHAR(To_Timestamp(split_part(o.order_id, '-',1),'YYYYMM')::timestamp without time zone, 'YYYY')
+													 ,TO_CHAR(To_Timestamp(split_part(o.order_id, '-',1),'YYYYMM')::timestamp without time zone, 'MM'))
+			else concat(TO_CHAR(o.created_at,'YYYY'),TO_CHAR(o.created_at,'MM')) end as month
+		, case when o.created_at is null then To_Timestamp(split_part(o.order_id, '-',1), 'YYYYMM')::timestamp without time zone
+			else o.created_at end
+		, o.updated_at,o.order_source
+		, o.customer_id, o.customer_mail
+		,case when kh.customer_mail1 <>'' and kh.customer_mail1 is not null then kh.customer_mail1 else o.customer_mail end as customer_mail1
+		, o.created_by, o.customer_level, o.exercise_type, o.subject
+		, o.total_amount/c1.rate as total_amount
+		, case when o.discount_percentage>1 then (o.total_amount/(100-o.discount_percentage)*o.discount_percentage)/c1.rate
+			when o.discount_percentage<1 then (o.total_amount/(1-o.discount_percentage)*o.discount_percentage)/c1.rate 
+			else null end as discount_amount
+		, o.paid_amount/c1.rate as paid_amount
+		, o.is_payment, o.hr_id, o.creater_id, nl.long_name
+		, case when (o.candidate_currency = '' or candidate_currency is null or lower(o.candidate_currency) = 'vnd') and o.candidate_payment <10000 
+			then o.candidate_payment*1000/22500
+			else o.candidate_payment/c2.rate end as candidate_payment
+		, o.order_status
+		, case when o.refund_percentage>100 then o.refund_percentage/c1.rate
+			when o.order_status = 'Refund'and o.refund_percentage is null then o.total_amount/c1.rate
+			when o.refund_percentage <=1 then o.total_amount * o.refund_percentage/c1.rate
+			else o.total_amount * o.refund_percentage/100/c1.rate
+			end as refund_amount
+		, o.refund_reason, o.tip_amount/c3.rate as tip_amount
+		, o.payment_status, o.done_at
+		, o.deadline as deadline
+		, case when o.deadline is null then 'Không ghi nhận ngày deadline'
+			when o.deadline < o.done_at then 'Misdeadline'
+			when o.deadline = o.done_at then 'Hoàn thành đúng deadline'
+			when o.deadline > o.done_at then 'Hoàn thành trước deadline'
+			when o.done_at is null and o.order_status = 'Done' then 'Không ghi nhận ngày done'
+			when o.order_status = 'Cancel' then null
+			else 'Đang thực hiện' end as deadline_status
+		--, case when kh.source <>'' and kh.source is not null then kh.source else o.order_source end as customer_source
+		, kh.source as customer_source
+		from data.orders o
+		left join data.currencies c1 on lower(o.order_currency) = lower(c1.iso)
+		left join data.currencies c2 on lower(o.candidate_currency) = lower(c2.iso)
+		left join data.currencies c3 on lower(o.tip_currency) = lower(c3.iso)
+		left join data.customers kh on o.customer_id = kh.customer_id and kh.customer_id <>''
+		left join data.creaters2 nl on o.creater_id = nl.short_name and nl.short_name <>''
+		where o.etl = 0
+		order by updated_at asc
+	) loop
+		with updatestatement as (
+			update data.orderdetails set
+				order_parent_id = orecord.order_parent_id, month = orecord.month
+				, created_at = orecord.created_at, updated_at = orecord.updated_at, order_source = orecord.order_source
+				, customer_id = orecord.customer_id, customer_mail = orecord.customer_mail, customer_mail1 = orecord.customer_mail1
+				, created_by = orecord.created_by,customer_level=orecord.customer_level, exercise_type = orecord.exercise_type
+				, subject=orecord.subject, total_amount=orecord.total_amount, discount_amount = orecord.discount_amount
+				, paid_amount = orecord.paid_amount, is_payment = orecord.is_payment, hr_id=orecord.hr_id
+				, creater_id = orecord.creater_id, creater_long_name = orecord.long_name, candidate_payment = orecord.candidate_payment
+				, order_status = orecord.order_status, refund_amount = orecord.refund_amount, refund_reason = orecord.refund_reason
+				, tip_amount = orecord.tip_amount, payment_status = orecord.payment_status, done_at = orecord.done_at
+				, deadline = orecord.deadline, deadline_status = orecord.deadline_status
+				, customer_source = orecord.customer_source, etl = 0
+			where order_id = orecord.order_id
+			returning 1
+		)
+		select count(*) into exitingrow from updatestatement;
+		
+		if exitingrow = 0 then
+			insert into data.orderdetails values(
+				orecord.order_id,orecord.order_parent_id,orecord.month,orecord.created_at,orecord.updated_at
+				,orecord.order_source,orecord.customer_id,orecord.customer_mail,orecord.customer_mail1,orecord.created_by
+				,orecord.customer_level,orecord.exercise_type,orecord.subject,orecord.total_amount,orecord.discount_amount
+				,orecord.paid_amount,orecord.is_payment,orecord.hr_id,orecord.creater_id,orecord.long_name
+				,orecord.candidate_payment,orecord.order_status,orecord.refund_amount,orecord.refund_reason,orecord.tip_amount
+				,orecord.payment_status,orecord.done_at,orecord.deadline,orecord.deadline_status, orecord.customer_source
+			);
+		end if;
+		
+		update data.orders set etl=1 where order_id = orecord.order_id;
+	end loop;
+END;
+$$;
+
+
+ALTER PROCEDURE etl.data_orderdetail() OWNER TO postgres;
+
+--
+-- Name: data_orders(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.data_orders()
+    LANGUAGE plpgsql
+    AS $$
+declare
+	exitingrow int;
+	dsdrecord record;
+begin
+	for dsdrecord in (select * from etl.clean_orders where etl = 0) loop
+		with updatestatement as(
+			update data.orders set id = dsdrecord.id, order_parent_id = dsdrecord.order_parent_id, created_at = dsdrecord.created_at, updated_at = dsdrecord.updated_at
+				,customer_id = dsdrecord.customer_id,col_1 = dsdrecord.col_1, order_source = dsdrecord.col_2, customer_mail = dsdrecord.customer_mail, created_by = dsdrecord.created_by
+				,col_3 = dsdrecord.col_3, col_4=dsdrecord.col_4, customer_level = dsdrecord.customer_level, exercise_type = dsdrecord.exercise_type, subject = dsdrecord.subject
+				, content = dsdrecord.content, total_amount = dsdrecord.total_amount, order_currency = dsdrecord.order_currency,discount_percentage = dsdrecord.discount_percentage
+				, discount_amount = dsdrecord.discount_amount, paid_amount = dsdrecord.paid_amount, is_payment = dsdrecord.is_payment, transaction_id = dsdrecord.transaction_id
+				, customer_paid_account = dsdrecord.customer_paid_account, order_note = dsdrecord.order_note, hr_id=dsdrecord.hr_id, creater_id = dsdrecord.creater_id
+				, candidate_payment = dsdrecord.candidate_payment, candidate_currency=dsdrecord.candidate_currency,candidate_expected_payment =dsdrecord.candidate_expected_payment
+				, order_status = dsdrecord.order_status, col_6=dsdrecord.col_6,col_7=dsdrecord.col_7,col_8=dsdrecord.col_8, check_status=dsdrecord.check_status, refund_percentage=dsdrecord.refund_percentage
+				, refund_amount=dsdrecord.refund_amount,refund_currency=dsdrecord.refund_currency,refund_reason=dsdrecord.refund_reason,tip_amount=dsdrecord.tip_amount
+				, tip_currency=dsdrecord.tip_currency,col_9=dsdrecord.col_9,col_10=dsdrecord.col_10,col_11=dsdrecord.col_11,payment_status=dsdrecord.payment_status,done_at=dsdrecord.done_at,note=dsdrecord.note
+				, etl = 0
+			where order_id = dsdrecord.order_id
+			returning 1
+		)
+		select count(*) into exitingrow from updatestatement;
+		if(exitingrow=0) then
+			insert into data.orders
+				values(dsdrecord.id,dsdrecord.order_id,dsdrecord.order_parent_id,dsdrecord.created_at,dsdrecord.updated_at,dsdrecord.customer_id,dsdrecord.col_1,dsdrecord.col_2
+					  ,dsdrecord.customer_mail,dsdrecord.created_by,dsdrecord.col_3,dsdrecord.col_4,dsdrecord.customer_level,dsdrecord.exercise_type,dsdrecord.subject
+					  ,dsdrecord.content,null,dsdrecord.total_amount,dsdrecord.order_currency,dsdrecord.discount_percentage,dsdrecord.discount_amount
+					  ,dsdrecord.paid_amount,dsdrecord.is_payment,dsdrecord.transaction_id
+					  ,dsdrecord.customer_paid_account,dsdrecord.order_note,dsdrecord.hr_id,dsdrecord.creater_id,dsdrecord.candidate_payment,dsdrecord.candidate_currency
+					  ,dsdrecord.candidate_expected_payment,dsdrecord.order_status,dsdrecord.col_6,dsdrecord.col_7,dsdrecord.col_8,dsdrecord.check_status
+					  ,dsdrecord.refund_percentage,dsdrecord.refund_amount
+					  ,dsdrecord.refund_currency,dsdrecord.refund_reason,dsdrecord.tip_amount,dsdrecord.tip_currency,dsdrecord.col_9,dsdrecord.col_10,dsdrecord.col_11
+					  ,dsdrecord.payment_status,dsdrecord.done_at,dsdrecord.note,0);
+		end if;
+		update etl.clean_orders set etl = 1 where id = dsdrecord.id;
+	end loop;
+end; 
+$$;
+
+
+ALTER PROCEDURE etl.data_orders() OWNER TO postgres;
+
+--
+-- Name: data_petty_expenses(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.data_petty_expenses()
+    LANGUAGE plpgsql
+    AS $$
+declare
+	re record;
+	ro int;
+	num int;
+begin
+	for re in (select ctid, * from  etl.clean_petty_expenses where etl = 0) loop
+		delete from data.petty_expenses where clv_id = re.clv_id;
+		if (re.month_cover = 1) then
+			insert into data.petty_expenses values (
+				re.clv_id, re.month, re.payment_at, re.accounting_at, re.month_cover
+				, re.payment_by, case when re.spend is null then 0 else re.spend end, case when re.collect is null then 0 else re.collect end
+				, re.currency, re.detail, re.type, re.category
+				, re.payment_id, re.backup, re.source, re.id);
+		else
+			insert into data.petty_expenses values (
+				re.clv_id
+				, case when re.accounting_at <> re.payment_at then 
+					concat(left((re.accounting_at + interval '1 month'*num)::text,4),split_part((re.accounting_at + interval '1 month'*num)::text,'-',2))
+					else re.month end
+				, re.payment_at, re.accounting_at, re.month_cover
+				, re.payment_by, case when re.spend is null then 0 else re.spend/re.month_cover end 
+				, case when re.collect is null then 0 else re.collect/re.month_cover end, re.currency, re.detail, re.type, re.category
+				, re.payment_id, re.backup, re.source, re.id);
+			num = 1;
+			for i in 1..re.month_cover - 1 loop
+				insert into data.petty_expenses values (
+					re.clv_id
+					, concat(left((re.accounting_at + interval '1 month'*num)::text,4),split_part((re.accounting_at + interval '1 month'*num)::text,'-',2))
+					, re.payment_at
+					, re.accounting_at + interval '1 month'*num
+					, 1
+					, re.payment_by, case when re.spend is null then 0 else re.spend/re.month_cover end 
+					, case when re.collect is null then 0 else re.collect/re.month_cover end, re.currency, re.detail, re.type, re.category
+					, re.payment_id, re.backup, re.source, re.id);
+				num:=num+1;
+			end loop;
+		end if;
+		update etl.clean_petty_expenses  set etl = 1 where id = re.id and ctid = re.ctid;
+	end loop;
+end; 
+$$;
+
+
+ALTER PROCEDURE etl.data_petty_expenses() OWNER TO postgres;
+
+--
+-- Name: data_salary(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.data_salary()
+    LANGUAGE plpgsql
+    AS $$
+Declare
+	r record;
+	ro int;
+Begin
+	For r in (select month, stt , id , name ,position , department , stk , bank 
+			, case when num_working_day = null then null:: numeric else num_working_day end as num_working_day
+			, case when num_working_day_standard = null then null:: numeric else num_working_day_standard end as num_working_day_standard
+			, case when sales_salary = null then null:: numeric else sales_salary/22500 end as sales_salary
+			, case when ot_salary = null then null:: numeric else ot_salary/22500 end as ot_salary
+			, case when advance_salary = null then null:: numeric else advance_salary/22500 end as advance_salary
+			, case when fines = null then null:: numeric else fines/22500 end as fines
+			, case when bonus = null then null:: numeric else bonus/22500 end as bonus
+			, case when basic_salary = null then null:: numeric else basic_salary/22500 end as basic_salary
+			, case when allowance = null then null:: numeric else allowance/22500 end as allowance
+			, case when hard_salary = null then null:: numeric else hard_salary/22500 end as hard_salary
+			, case when time_salary = null then null:: numeric else time_salary/22500 end as time_salary
+			, case when final_salary = null then null:: numeric else final_salary/22500 end as final_salary
+			, backup, gen_id , updated_time 
+			from etl.clean_salary where etl = 0) LOOP
+		with upd as(update data.salary set 
+				   stt=r.stt,name=r.name, position = r.position, department=r.department,stk=r.stk,bank=r.bank
+				   , num_working_day=r.num_working_day, num_working_day_standard = r.num_working_day_standard
+				   , sales_salary = r.sales_salary, ot_salary = r.ot_salary, advance_salary = r.advance_salary
+				   , fines=r.fines, bonus=r.bonus, basic_salary = r.basic_salary, allowance = r.allowance
+				   , hard_salary=r.hard_salary, time_salary=r.time_salary, final_salary = r.final_salary
+				   , backup = r.backup, gen_id = r.gen_id, updated_time = r.updated_time
+				   where month = r.month and id = r.id
+				   RETURNING 1)
+			select count(*) into ro from upd;
+		if (ro=0) then
+			insert into data.salary values (
+				r.month, r.stt, r.id, r.name, r.position, r.department, r.stk, r.bank, r.num_working_day, r.num_working_day_standard
+				, r.sales_salary, r.ot_salary, r.advance_salary, r.fines, r.bonus, r.basic_salary, r.allowance
+				, r.hard_salary, r.time_salary, r.final_salary, r.backup, r.gen_id, r.updated_time);
+			end if;
+		update etl.clean_salary set etl = 1 where gen_id = r.gen_id;
+	end loop;
+end;
+$$;
+
+
+ALTER PROCEDURE etl.data_salary() OWNER TO postgres;
+
+--
+-- Name: data_transaction(); Type: PROCEDURE; Schema: etl; Owner: postgres
+--
+
+CREATE PROCEDURE etl.data_transaction()
+    LANGUAGE plpgsql
+    AS $$
+declare
+	ro int;
+	r record;
+begin
+	for r in (select t.ctid, t.*, c1.rate as rate1, c2.rate as rate2 
+			  from etl.clean_transaction t
+			  left join data.currencies c1 on t.payment_currency = c1.iso
+			  left join data.currencies c2 on t.cost_currency = c2.iso
+			  where t.etl = 0) loop
+		with updatestatement as(
+			update data.transaction set
+			default_id= r.default_id, created_at = r.created_at, updated_at = r.updated_at
+			, order_parent_id = r.order_parent_id, transaction_id = r.transaction_id, total_amount = r.total_amount
+			, payment_currency = r.payment_currency, transaction_cost = r.transaction_cost, cost_currency = r.cost_currency
+			, payment_methods = r.payment_methods, payment_account = r.payment_account, payment_type = r.payment_type
+			, col1=r.col1, col2=r.col2,col3 =r.col3, note= r.note, etl = 0
+			where  id=r.id
+			returning 1)
+		select count(*) into ro from updatestatement;
+		if ro = 0 then
+			insert into data.transaction values(
+			r.default_id, r.id,r.created_at,r.updated_at,r.order_parent_id, r.transaction_id
+			,r.total_amount, r.payment_currency,r.transaction_cost, r.cost_currency,r.payment_methods, r.payment_account
+			, r.payment_type,r.col1,r.col2,r.col3, r.note,0);
+		end if;
+		update etl.clean_transaction set etl=1 where ctid = r.ctid and default_id = r.default_id;
+	end loop;
+end;
+$$;
+
+
+ALTER PROCEDURE etl.data_transaction() OWNER TO postgres;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: bu; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.bu (
+    order_id text,
+    order_parent_id text,
+    month text,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    order_source text,
+    customer_id text,
+    customer_mail text,
+    customer_mail1 text,
+    created_by text,
+    customer_level text,
+    exercise_type text,
+    subject text,
+    total_amount real,
+    discount_amount double precision,
+    paid_amount real,
+    is_payment text,
+    hr_id text,
+    creater_id text,
+    creater_long_name text,
+    candidate_payment double precision,
+    order_status text,
+    refund_amount double precision,
+    refund_reason text,
+    tip_amount real,
+    payment_status text,
+    done_at timestamp without time zone,
+    deadline timestamp without time zone,
+    deadline_status text,
+    customer_source text
+);
+
+
+ALTER TABLE data.bu OWNER TO postgres;
+
+--
+-- Name: creaters; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.creaters (
+    id uuid,
+    creater_id text,
+    updated_at timestamp without time zone,
+    creater_short_name text,
+    hr_id text,
+    creater_name text,
+    creater_long_name text,
+    creater_mail text,
+    creater_year text,
+    study_at text,
+    ielts_writing_score text,
+    creater_feild text,
+    creater_bank_account text,
+    creater_bank text,
+    cv_link text,
+    creater_status text,
+    creater_evaluate text,
+    note text
+);
+
+
+ALTER TABLE data.creaters OWNER TO postgres;
+
+--
+-- Name: creaters2; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.creaters2 (
+    created_at timestamp without time zone,
+    hr text,
+    short_name text,
+    name text,
+    phone text,
+    study_at text,
+    ielts_score text,
+    fields text,
+    cv text,
+    esay text,
+    hours_active text,
+    hours_note text,
+    note text,
+    check_status text,
+    status text,
+    updated_at timestamp without time zone,
+    long_name text,
+    id text,
+    db_id uuid
+);
+
+
+ALTER TABLE data.creaters2 OWNER TO postgres;
+
+--
+-- Name: currencies; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.currencies (
+    iso character varying(10),
+    rate real
+);
+
+
+ALTER TABLE data.currencies OWNER TO postgres;
+
+--
+-- Name: customer_types; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.customer_types (
+    customer_id text,
+    month text,
+    cus_type text
+);
+
+
+ALTER TABLE data.customer_types OWNER TO postgres;
+
+--
+-- Name: customers; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.customers (
+    id uuid,
+    customer_id character varying(200),
+    created_at date,
+    updated_at timestamp without time zone,
+    created_by character varying(200),
+    customer_name character varying(100),
+    customer_mail1 character varying(200),
+    customer_mail2 character varying(200),
+    customer_mail3 character varying(200),
+    customer_level character varying(100),
+    source character varying(200),
+    customer_country character varying(200),
+    note text,
+    customer_old_id character varying(200)
+);
+
+
+ALTER TABLE data.customers OWNER TO postgres;
+
+--
+-- Name: orderdetails; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.orderdetails (
+    order_id text,
+    order_parent_id text,
+    month text,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    order_source text,
+    customer_id text,
+    customer_mail text,
+    customer_mail1 text,
+    created_by text,
+    customer_level text,
+    exercise_type text,
+    subject text,
+    total_amount real,
+    discount_amount double precision,
+    paid_amount real,
+    is_payment text,
+    hr_id text,
+    creater_id text,
+    creater_long_name text,
+    candidate_payment double precision,
+    order_status text,
+    refund_amount double precision,
+    refund_reason text,
+    tip_amount real,
+    payment_status text,
+    done_at timestamp without time zone,
+    deadline timestamp without time zone,
+    deadline_status text,
+    customer_source text,
+    etl smallint DEFAULT 0
+);
+
+
+ALTER TABLE data.orderdetails OWNER TO postgres;
+
+--
+-- Name: orderdetails2; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.orderdetails2 (
+    order_id text,
+    order_parent_id text,
+    month text,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    order_source text,
+    customer_id text,
+    customer_mail text,
+    customer_mail1 text,
+    created_by text,
+    customer_level text,
+    exercise_type text,
+    subject text,
+    total_amount real,
+    discount_amount double precision,
+    paid_amount real,
+    is_payment text,
+    hr_id text,
+    creater_id text,
+    creater_long_name text,
+    candidate_payment double precision,
+    order_status text,
+    refund_amount double precision,
+    refund_reason text,
+    tip_amount real,
+    payment_status text,
+    done_at timestamp without time zone,
+    deadline timestamp without time zone,
+    deadline_status text,
+    customer_source text
+);
+
+
+ALTER TABLE data.orderdetails2 OWNER TO postgres;
+
+--
+-- Name: orderdetails_copy; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.orderdetails_copy (
+    order_id text,
+    order_parent_id text,
+    month text,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    order_source text,
+    customer_id text,
+    customer_mail text,
+    customer_mail1 text,
+    created_by text,
+    customer_level text,
+    exercise_type text,
+    subject text,
+    total_amount real,
+    discount_amount double precision,
+    paid_amount real,
+    is_payment text,
+    hr_id text,
+    creater_id text,
+    creater_long_name text,
+    candidate_payment double precision,
+    order_status text,
+    refund_amount double precision,
+    refund_reason text,
+    tip_amount real,
+    payment_status text,
+    done_at timestamp without time zone,
+    deadline timestamp without time zone,
+    deadline_status text,
+    customer_source text
+);
+
+
+ALTER TABLE data.orderdetails_copy OWNER TO postgres;
+
+--
+-- Name: orders; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.orders (
+    id uuid,
+    order_id text,
+    order_parent_id text,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    customer_id text,
+    col_1 text,
+    order_source text,
+    customer_mail text,
+    created_by text,
+    col_3 text,
+    col_4 text,
+    customer_level text,
+    exercise_type text,
+    subject text,
+    content text,
+    deadline timestamp without time zone,
+    total_amount real,
+    order_currency text,
+    discount_percentage real,
+    discount_amount double precision,
+    paid_amount real,
+    is_payment text,
+    transaction_id text,
+    customer_paid_account text,
+    order_note text,
+    hr_id text,
+    creater_id text,
+    candidate_payment numeric,
+    candidate_currency text,
+    candidate_expected_payment numeric,
+    order_status text,
+    col_6 text,
+    col_7 text,
+    col_8 text,
+    check_status text,
+    refund_percentage numeric,
+    refund_amount numeric,
+    refund_currency text,
+    refund_reason text,
+    tip_amount real,
+    tip_currency text,
+    col_9 text,
+    col_10 text,
+    col_11 text,
+    payment_status text,
+    done_at timestamp without time zone,
+    note text,
+    etl smallint DEFAULT 0
+);
+
+
+ALTER TABLE data.orders OWNER TO postgres;
+
+--
+-- Name: petty_expenses; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.petty_expenses (
+    clv_id text,
+    month text,
+    payment_at timestamp without time zone,
+    accounting_at timestamp without time zone,
+    month_cover numeric,
+    payment_by text,
+    spend numeric,
+    collect numeric,
+    currency text DEFAULT 'VND'::text,
+    detail text,
+    type text,
+    category text,
+    payment_id text,
+    backup text,
+    source text,
+    id uuid
+);
+
+
+ALTER TABLE data.petty_expenses OWNER TO postgres;
+
+--
+-- Name: salary; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.salary (
+    month text,
+    stt text,
+    id text,
+    name text,
+    "position" text,
+    department text,
+    stk text,
+    bank text,
+    num_working_day numeric,
+    num_working_day_standard numeric,
+    sales_salary numeric,
+    ot_salary numeric,
+    advance_salary numeric,
+    fines numeric,
+    bonus numeric,
+    basic_salary numeric,
+    allowance numeric,
+    hard_salary numeric,
+    time_salary numeric,
+    final_salary numeric,
+    backup text,
+    gen_id uuid,
+    updated_time timestamp without time zone
+);
+
+
+ALTER TABLE data.salary OWNER TO postgres;
+
+--
+-- Name: transaction; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.transaction (
+    default_id uuid,
+    id text,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    order_parent_id text,
+    transaction_id text,
+    total_amount numeric,
+    payment_currency text,
+    transaction_cost numeric,
+    cost_currency text,
+    payment_methods text,
+    payment_account text,
+    payment_type text,
+    col1 text,
+    col2 text,
+    col3 text,
+    note text,
+    etl integer
+);
+
+
+ALTER TABLE data.transaction OWNER TO postgres;
+
+--
+-- Name: transaction_breakdown; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.transaction_breakdown (
+    order_id text,
+    created_at timestamp without time zone,
+    order_parent_id text,
+    total_amount real,
+    total_parent real,
+    trans double precision,
+    receiced_amount double precision
+);
+
+
+ALTER TABLE data.transaction_breakdown OWNER TO postgres;
+
+--
+-- Name: v_candidate_cost; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_candidate_cost AS
+ SELECT replace(orderdetails.month, '/'::text, ''::text) AS month,
+    sum(orderdetails.candidate_payment) AS "Phí trả người làm"
+   FROM data.orderdetails
+  GROUP BY (replace(orderdetails.month, '/'::text, ''::text))
+  ORDER BY (replace(orderdetails.month, '/'::text, ''::text)) DESC
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_candidate_cost OWNER TO postgres;
+
+--
+-- Name: v_transaction_breakdown; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_transaction_breakdown AS
+ WITH tran AS (
+         SELECT tr_1.order_parent_id,
+            sum(((tr_1.total_amount)::double precision / c.rate)) AS trans
+           FROM (data.transaction tr_1
+             LEFT JOIN data.currencies c ON ((lower(tr_1.payment_currency) = lower((c.iso)::text))))
+          WHERE (tr_1.payment_type !~~ '%efund%'::text)
+          GROUP BY tr_1.order_parent_id
+        ), total AS (
+         SELECT orderdetails.order_parent_id,
+            sum(orderdetails.total_amount) AS total
+           FROM data.orderdetails
+          GROUP BY orderdetails.order_parent_id
+        )
+ SELECT o.order_id,
+    o.created_at,
+    o.order_parent_id,
+    o.total_amount,
+    t.total AS total_parent,
+    tr.trans,
+        CASE
+            WHEN ((t.total IS NULL) OR (t.total = (0)::double precision)) THEN NULL::double precision
+            ELSE ((o.total_amount * tr.trans) / t.total)
+        END AS receiced_amount
+   FROM ((data.orderdetails o
+     LEFT JOIN total t ON (((o.order_parent_id = t.order_parent_id) AND (t.order_parent_id IS NOT NULL))))
+     LEFT JOIN tran tr ON (((o.order_parent_id = tr.order_parent_id) AND (tr.order_parent_id IS NOT NULL) AND (tr.order_parent_id <> ''::text))))
+  ORDER BY o.order_id
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_transaction_breakdown OWNER TO postgres;
+
+--
+-- Name: v_creater_view; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_creater_view AS
+ SELECT o.creater_id AS "Người làm id",
+    max(nl.creater_long_name) AS "Mã hóa",
+    '_Tổng'::text AS "Tháng",
+    count(o.order_id) AS "Tổng số đơn",
+    sum(o.candidate_payment) AS "Số tiền đã nhận",
+    (sum(o.total_amount))::numeric(10,2) AS "Tổng giá trị đơn hàng",
+    (sum(o.paid_amount))::numeric(10,2) AS "Tổng số tiền khách đã thanh toán",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END))::numeric(10,2) AS "Tổng số tiền thực nhận",
+    (sum(o.refund_amount))::numeric(10,2) AS "Refund"
+   FROM ((data.orderdetails o
+     LEFT JOIN data.creaters nl ON (((o.creater_id = nl.creater_short_name) AND (nl.creater_short_name <> ''::text))))
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at) AND (o.month >= '2021/08'::text))))
+  WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+  GROUP BY o.creater_id
+UNION
+ SELECT o.creater_id AS "Người làm id",
+    max(nl.creater_long_name) AS "Mã hóa",
+    o.month AS "Tháng",
+    count(o.order_id) AS "Tổng số đơn",
+    sum(o.candidate_payment) AS "Số tiền đã nhận",
+    (sum(o.total_amount))::numeric(10,2) AS "Tổng giá trị đơn hàng",
+    (sum(o.paid_amount))::numeric(10,2) AS "Tổng số tiền khách đã thanh toán",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END))::numeric(10,2) AS "Tổng số tiền thực nhận",
+    (sum(o.refund_amount))::numeric(10,2) AS "Refund"
+   FROM ((data.orderdetails o
+     LEFT JOIN data.creaters nl ON (((o.creater_id = nl.creater_short_name) AND (nl.creater_short_name <> ''::text))))
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at) AND (o.month >= '2021/08'::text))))
+  WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+  GROUP BY o.month, o.creater_id
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_creater_view OWNER TO postgres;
+
+--
+-- Name: v_customer_type_clean; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_customer_type_clean AS
+ WITH min_date AS (
+         SELECT orderdetails.customer_id,
+            min(orderdetails.month) AS min_date
+           FROM data.orderdetails
+          GROUP BY orderdetails.customer_id
+        ), used_month AS (
+         SELECT o.customer_id,
+            o.month,
+            ( SELECT count(DISTINCT orderdetails.month) AS count
+                   FROM data.orderdetails
+                  WHERE ((orderdetails.customer_id = o.customer_id) AND (orderdetails.month <= o.month))) AS used_month,
+            ( SELECT sum(orderdetails.paid_amount) AS sum
+                   FROM data.orderdetails
+                  WHERE ((orderdetails.customer_id = o.customer_id) AND (orderdetails.month <= o.month))) AS paid_amount,
+            ((((split_part(o.month, '/'::text, 1))::numeric - (split_part(min(mi.min_date), '/'::text, 1))::numeric) * (12)::numeric) + (((split_part(o.month, '/'::text, 2))::numeric - (split_part(min(mi.min_date), '/'::text, 2))::numeric) + (1)::numeric)) AS total_month
+           FROM (data.orderdetails o
+             LEFT JOIN min_date mi ON (((o.customer_id = mi.customer_id) AND ((mi.customer_id <> ''::text) OR (mi.customer_id IS NOT NULL)))))
+          GROUP BY o.customer_id, o.month
+        ), overall AS (
+         SELECT u.customer_id,
+            u.month,
+            u.used_month,
+            u.paid_amount,
+            u.total_month,
+            mi.min_date
+           FROM (used_month u
+             LEFT JOIN min_date mi ON (((u.customer_id = mi.customer_id) AND ((mi.customer_id <> ''::text) OR (mi.customer_id IS NOT NULL)))))
+        )
+ SELECT overall.customer_id,
+    overall.month,
+        CASE
+            WHEN ((overall.paid_amount = (0)::double precision) OR (overall.paid_amount IS NULL)) THEN '6. Khách để miss'::text
+            WHEN ((overall.total_month >= (3)::numeric) AND (((overall.used_month)::numeric / overall.total_month) > 0.8)) THEN '4. Khách trung thành'::text
+            WHEN (overall.month > overall.min_date) THEN '5. Khách quay lại khác'::text
+            WHEN (overall.month = overall.min_date) THEN '2. Khách mới'::text
+            ELSE '7. Blank'::text
+        END AS cus_type
+   FROM overall
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_customer_type_clean OWNER TO postgres;
+
+--
+-- Name: v_customer_on_db; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_customer_on_db AS
+ SELECT '_Tổng'::text AS "Nguồn",
+    o.month AS "Tháng",
+    count(DISTINCT o.customer_id) AS "Số khách hàng trong tháng",
+    ( SELECT count(DISTINCT orderdetails.customer_id) AS count
+           FROM (data.orderdetails
+             LEFT JOIN data.v_customer_type_clean cs ON (((orderdetails.customer_id = cs.customer_id) AND (orderdetails.month = cs.month))))
+          WHERE ((orderdetails.month = o.month) AND ((cs.cus_type ~~ '4.%'::text) OR (cs.cus_type ~~ '5.%'::text)))) AS "Số khách hàng quay lại",
+    ( SELECT count(DISTINCT orderdetails.customer_id) AS count
+           FROM data.orderdetails
+          WHERE (orderdetails.month <= o.month)) AS "Tổng khách hàng",
+        CASE
+            WHEN ((( SELECT count(DISTINCT orderdetails.customer_id) AS count
+               FROM data.orderdetails
+              WHERE (orderdetails.month < o.month)))::numeric <> (0)::numeric) THEN ((( SELECT count(DISTINCT orderdetails.customer_id) AS count
+               FROM (data.orderdetails
+                 LEFT JOIN data.v_customer_type_clean cs ON (((orderdetails.customer_id = cs.customer_id) AND (orderdetails.month = cs.month))))
+              WHERE ((orderdetails.month = o.month) AND ((cs.cus_type ~~ '4.%'::text) OR (cs.cus_type ~~ '5.%'::text)))))::numeric / (( SELECT count(DISTINCT orderdetails.customer_id) AS count
+               FROM data.orderdetails
+              WHERE (orderdetails.month < o.month)))::numeric)
+            ELSE (0)::numeric
+        END AS "Tỷ lệ khách quay lại",
+    ( SELECT count(ma.customer_id) AS count
+           FROM ( SELECT kh.customer_id,
+                    o_1.max_date
+                   FROM (data.customers kh
+                     LEFT JOIN ( SELECT orderdetails.customer_id,
+                            max(orderdetails.created_at) AS max_date
+                           FROM data.orderdetails
+                          WHERE (orderdetails.month <= o.month)
+                          GROUP BY orderdetails.customer_id) o_1 ON (((kh.customer_id)::text = o_1.customer_id)))) ma
+          WHERE (ma.max_date <= ((( SELECT max(orderdetails.created_at) AS max
+                   FROM data.orderdetails
+                  WHERE (orderdetails.month <= o.month)))::date - '3 mons'::interval))) AS "Số khách inactive 3 tháng",
+    ( SELECT count(ma.customer_id) AS count
+           FROM ( SELECT kh.customer_id,
+                    o_1.max_date
+                   FROM (data.customers kh
+                     LEFT JOIN ( SELECT orderdetails.customer_id,
+                            max(orderdetails.created_at) AS max_date
+                           FROM data.orderdetails
+                          WHERE (orderdetails.month <= o.month)
+                          GROUP BY orderdetails.customer_id) o_1 ON (((kh.customer_id)::text = o_1.customer_id)))) ma
+          WHERE (ma.max_date <= ((( SELECT max(orderdetails.created_at) AS max
+                   FROM data.orderdetails
+                  WHERE (orderdetails.month <= o.month)))::date - '4 mons'::interval))) AS "Số khách inactive 4 tháng",
+    ( SELECT count(ma.customer_id) AS count
+           FROM ( SELECT kh.customer_id,
+                    o_1.max_date
+                   FROM (data.customers kh
+                     LEFT JOIN ( SELECT orderdetails.customer_id,
+                            max(orderdetails.created_at) AS max_date
+                           FROM data.orderdetails
+                          WHERE (orderdetails.month <= o.month)
+                          GROUP BY orderdetails.customer_id) o_1 ON (((kh.customer_id)::text = o_1.customer_id)))) ma
+          WHERE (ma.max_date <= ((( SELECT max(orderdetails.created_at) AS max
+                   FROM data.orderdetails
+                  WHERE (orderdetails.month <= o.month)))::date - '6 mons'::interval))) AS "Số khách inactive 6 tháng"
+   FROM data.orderdetails o
+  GROUP BY o.month
+UNION
+ SELECT o.customer_source AS "Nguồn",
+    o.month AS "Tháng",
+    count(DISTINCT o.customer_id) AS "Số khách hàng trong tháng",
+    ( SELECT count(DISTINCT orderdetails.customer_id) AS count
+           FROM (data.orderdetails
+             LEFT JOIN data.v_customer_type_clean cs ON (((orderdetails.customer_id = cs.customer_id) AND (orderdetails.month = cs.month))))
+          WHERE ((orderdetails.month = o.month) AND (orderdetails.customer_source = o.customer_source) AND ((cs.cus_type ~~ '4.%'::text) OR (cs.cus_type ~~ '5.%'::text)))) AS "Số khách hàng quay lại",
+    ( SELECT count(DISTINCT orderdetails.customer_id) AS count
+           FROM data.orderdetails
+          WHERE ((orderdetails.month <= o.month) AND (orderdetails.customer_source = o.customer_source))) AS "Tổng khách hàng",
+        CASE
+            WHEN ((( SELECT count(DISTINCT orderdetails.customer_id) AS count
+               FROM data.orderdetails
+              WHERE ((orderdetails.month < o.month) AND (orderdetails.customer_source = o.customer_source))))::numeric <> (0)::numeric) THEN ((( SELECT count(DISTINCT orderdetails.customer_id) AS count
+               FROM (data.orderdetails
+                 LEFT JOIN data.v_customer_type_clean cs ON (((orderdetails.customer_id = cs.customer_id) AND (orderdetails.month = cs.month))))
+              WHERE ((orderdetails.month = o.month) AND (orderdetails.customer_source = o.customer_source) AND ((cs.cus_type ~~ '4.%'::text) OR (cs.cus_type ~~ '5.%'::text)))))::numeric / (( SELECT count(DISTINCT orderdetails.customer_id) AS count
+               FROM data.orderdetails
+              WHERE ((orderdetails.month < o.month) AND (orderdetails.customer_source = o.customer_source))))::numeric)
+            ELSE (0)::numeric
+        END AS "Tỷ lệ khách quay lại",
+    ( SELECT count(ma.customer_id) AS count
+           FROM ( SELECT kh.customer_id,
+                    o_1.max_date
+                   FROM (data.customers kh
+                     LEFT JOIN ( SELECT orderdetails.customer_id,
+                            max(orderdetails.created_at) AS max_date
+                           FROM data.orderdetails
+                          WHERE ((orderdetails.month <= o.month) AND (orderdetails.customer_source = o.customer_source))
+                          GROUP BY orderdetails.customer_id) o_1 ON (((kh.customer_id)::text = o_1.customer_id)))
+                  WHERE ((kh.source)::text = o.customer_source)) ma
+          WHERE (ma.max_date <= ((( SELECT max(orderdetails.created_at) AS max
+                   FROM data.orderdetails
+                  WHERE ((orderdetails.month <= o.month) AND (orderdetails.customer_source = o.customer_source))))::date - '3 mons'::interval))) AS "Số khách inactive 3 tháng",
+    ( SELECT count(ma.customer_id) AS count
+           FROM ( SELECT kh.customer_id,
+                    o_1.max_date
+                   FROM (data.customers kh
+                     LEFT JOIN ( SELECT orderdetails.customer_id,
+                            max(orderdetails.created_at) AS max_date
+                           FROM data.orderdetails
+                          WHERE ((orderdetails.month <= o.month) AND (orderdetails.customer_source = o.customer_source))
+                          GROUP BY orderdetails.customer_id) o_1 ON (((kh.customer_id)::text = o_1.customer_id)))
+                  WHERE ((kh.source)::text = o.customer_source)) ma
+          WHERE (ma.max_date <= ((( SELECT max(orderdetails.created_at) AS max
+                   FROM data.orderdetails
+                  WHERE ((orderdetails.month <= o.month) AND (orderdetails.customer_source = o.customer_source))))::date - '4 mons'::interval))) AS "Số khách inactive 4 tháng",
+    ( SELECT count(ma.customer_id) AS count
+           FROM ( SELECT kh.customer_id,
+                    o_1.max_date
+                   FROM (data.customers kh
+                     LEFT JOIN ( SELECT orderdetails.customer_id,
+                            max(orderdetails.created_at) AS max_date
+                           FROM data.orderdetails
+                          WHERE ((orderdetails.month <= o.month) AND (orderdetails.customer_source = o.customer_source))
+                          GROUP BY orderdetails.customer_id) o_1 ON (((kh.customer_id)::text = o_1.customer_id)))
+                  WHERE ((kh.source)::text = o.customer_source)) ma
+          WHERE (ma.max_date <= ((( SELECT max(orderdetails.created_at) AS max
+                   FROM data.orderdetails
+                  WHERE ((orderdetails.month <= o.month) AND (orderdetails.customer_source = o.customer_source))))::date - '6 mons'::interval))) AS "Số khách inactive 6 tháng"
+   FROM data.orderdetails o
+  GROUP BY o.month, o.customer_source
+  ORDER BY 2 DESC, 1
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_customer_on_db OWNER TO postgres;
+
+--
+-- Name: v_customer_overview; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_customer_overview AS
+ WITH cte AS (
+         SELECT o_1.customer_id,
+            o_1.created_by,
+            count(DISTINCT o_1.order_parent_id) AS num,
+            max(o_1.created_at) AS date,
+            sum(o_1.total_amount) AS total_amount
+           FROM data.orderdetails o_1
+          WHERE ((o_1.created_by IS NOT NULL) AND (o_1.created_by <> ''::text))
+          GROUP BY o_1.customer_id, o_1.created_by
+        ), cte_maxorder AS (
+         SELECT cte.customer_id,
+            max(cte.num) AS num
+           FROM cte
+          GROUP BY cte.customer_id
+        ), cte_getmaxorder AS (
+         SELECT ct.customer_id,
+            ct.created_by,
+            ct.num,
+            ct.date,
+            ct.total_amount
+           FROM (cte ct
+             JOIN cte_maxorder mo ON (((ct.customer_id = mo.customer_id) AND (ct.num = mo.num))))
+        ), cte_maxamount AS (
+         SELECT cte_getmaxorder.customer_id,
+            max(cte_getmaxorder.total_amount) AS total_amount
+           FROM cte_getmaxorder
+          GROUP BY cte_getmaxorder.customer_id
+        ), cte_getmaxamount AS (
+         SELECT gmo.customer_id,
+            gmo.created_by,
+            gmo.num,
+            gmo.date,
+            gmo.total_amount
+           FROM (cte_getmaxorder gmo
+             JOIN cte_maxamount ma_1 ON (((gmo.customer_id = ma_1.customer_id) AND (gmo.total_amount = ma_1.total_amount))))
+        ), cte_maxdate AS (
+         SELECT cte_getmaxamount.customer_id,
+            max(cte_getmaxamount.date) AS date
+           FROM cte_getmaxamount
+          GROUP BY cte_getmaxamount.customer_id
+        ), caremax AS (
+         SELECT gma.customer_id,
+            max(gma.created_by) AS created_by,
+            max(gma.date) AS date,
+            max(gma.total_amount) AS amount
+           FROM (cte_getmaxamount gma
+             JOIN cte_maxdate md ON (((gma.customer_id = md.customer_id) AND (gma.date = md.date))))
+          WHERE ((gma.created_by IS NOT NULL) AND (gma.created_by <> ''::text))
+          GROUP BY gma.customer_id
+        ), mincare AS (
+         SELECT o_1.customer_id,
+            min(o_1.created_by) AS min_care
+           FROM (data.orderdetails o_1
+             JOIN ( SELECT orderdetails.customer_id,
+                    min(orderdetails.created_at) AS created_at
+                   FROM data.orderdetails
+                  WHERE ((orderdetails.created_by IS NOT NULL) AND (orderdetails.created_by <> ''::text))
+                  GROUP BY orderdetails.customer_id) grou ON (((o_1.customer_id = grou.customer_id) AND (o_1.created_at = grou.created_at))))
+          WHERE ((o_1.created_by IS NOT NULL) AND (o_1.created_by <> ''::text))
+          GROUP BY o_1.customer_id
+        ), maxcare AS (
+         SELECT o_1.customer_id,
+            max(o_1.created_by) AS max_care
+           FROM (data.orderdetails o_1
+             JOIN ( SELECT orderdetails.customer_id,
+                    max(orderdetails.created_at) AS created_at
+                   FROM data.orderdetails
+                  WHERE ((orderdetails.created_by IS NOT NULL) AND (orderdetails.created_by <> ''::text))
+                  GROUP BY orderdetails.customer_id) grou ON (((o_1.customer_id = grou.customer_id) AND (o_1.created_at = grou.created_at))))
+          WHERE ((o_1.created_by IS NOT NULL) AND (o_1.created_by <> ''::text))
+          GROUP BY o_1.customer_id
+        ), other AS (
+         SELECT o_1.customer_id,
+            max(o_1.customer_mail1) AS customer_mail1,
+            max((kh.customer_name)::text) AS customer_name,
+            max((kh.source)::text) AS order_source,
+            concat(split_part((min(o_1.created_at))::text, '-'::text, 2), '/', split_part((min(o_1.created_at))::text, '-'::text, 1)) AS min_date,
+            concat(split_part((max(o_1.created_at))::text, '-'::text, 2), '/', split_part((max(o_1.created_at))::text, '-'::text, 1)) AS max_date,
+            (((((split_part((max(o_1.created_at))::text, '-'::text, 1))::numeric - (split_part((min(o_1.created_at))::text, '-'::text, 1))::numeric) * (12)::numeric) + ((split_part((max(o_1.created_at))::text, '-'::text, 2))::numeric - (split_part((min(o_1.created_at))::text, '-'::text, 2))::numeric)) + (1)::numeric) AS total_month,
+            ( SELECT count(DISTINCT orderdetails.month) AS count
+                   FROM data.orderdetails
+                  WHERE (orderdetails.customer_id = o_1.customer_id)) AS used_month,
+            count(DISTINCT o_1.subject) AS subject,
+            count(o_1.order_id) AS total_order,
+            sum(o_1.total_amount) AS total_amount,
+            sum(o_1.paid_amount) AS paid_amount,
+            sum(
+                CASE
+                    WHEN (o_1.month < '2021/08'::text) THEN (o_1.paid_amount)::double precision
+                    ELSE br.receiced_amount
+                END) AS "Tổng số tiền thực nhận",
+                CASE
+                    WHEN (sum(o_1.paid_amount) IS NULL) THEN sum((o_1.total_amount - (0)::double precision))
+                    ELSE (sum((o_1.total_amount - o_1.paid_amount)))::double precision
+                END AS remain_amount,
+            sum(o_1.refund_amount) AS refund
+           FROM ((data.orderdetails o_1
+             FULL JOIN data.customers kh ON ((o_1.customer_id = (kh.customer_id)::text)))
+             LEFT JOIN data.v_transaction_breakdown br ON (((o_1.order_id = br.order_id) AND (o_1.created_at = br.created_at) AND (o_1.month >= '2021/08'::text))))
+          GROUP BY o_1.customer_id
+        )
+ SELECT o.customer_id AS "Mã khách hàng",
+    o.customer_mail1 AS "Email",
+    o.customer_name AS "Tên khách hàng",
+    o.order_source AS "Nguồn",
+    c.created_by AS "Người care nhiều nhất",
+    mi.min_care AS "Người care đầu tiên",
+    ma.max_care AS "Người care gần nhất",
+    o.min_date AS "Tháng đầu sử dụng",
+    o.max_date AS "Tháng sử dụng gần nhất",
+    o.total_month AS "Tổng số tháng đã sử dụng",
+    o.used_month AS "Tổng số tháng có đơn",
+    o.subject AS "Tổng số môn đã order",
+    o.total_order AS "Tổng số đơn",
+    (o.total_amount)::numeric(10,2) AS "Tổng giá trị đơn hàng",
+    (o.paid_amount)::numeric(10,2) AS "Tổng số tiền đã nhận",
+    o."Tổng số tiền thực nhận",
+    (o.remain_amount)::numeric(10,2) AS "Tổng số tiền còn nợ",
+    (o.refund)::numeric(10,2) AS "Refund"
+   FROM (((other o
+     LEFT JOIN caremax c ON ((o.customer_id = c.customer_id)))
+     LEFT JOIN mincare mi ON ((mi.customer_id = c.customer_id)))
+     LEFT JOIN maxcare ma ON ((ma.customer_id = c.customer_id)))
+  ORDER BY o.total_order DESC
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_customer_overview OWNER TO postgres;
+
+--
+-- Name: v_customer_payment; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_customer_payment AS
+ SELECT max(o.customer_mail1) AS "Email",
+    o.customer_id AS "ID khách",
+    max(o.customer_source) AS "Nguồn",
+    '_Tổng'::text AS "Tháng",
+    count(o.order_id) AS "Số đơn",
+    sum(o.total_amount) AS "Tổng giá trị đơn hàng",
+    sum(o.discount_amount) AS "Tổng giảm giá",
+    sum(o.paid_amount) AS "Tổng số tiền đã nhận",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Tổng số tiền thực nhận",
+    sum((o.total_amount - o.paid_amount)) AS "Số tiền còn nợ",
+    sum(o.refund_amount) AS "Refund"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at) AND (o.month >= '2021/08'::text))))
+  GROUP BY o.customer_id
+UNION
+ SELECT max(o.customer_mail1) AS "Email",
+    o.customer_id AS "ID khách",
+    max(o.customer_source) AS "Nguồn",
+    o.month AS "Tháng",
+    count(o.order_id) AS "Số đơn",
+    sum(o.total_amount) AS "Tổng giá trị đơn hàng",
+    sum(o.discount_amount) AS "Tổng giảm giá",
+    sum(o.paid_amount) AS "Tổng số tiền đã nhận",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Tổng số tiền thực nhận",
+    sum((o.total_amount - o.paid_amount)) AS "Số tiền còn nợ",
+    sum(o.refund_amount) AS "Refund"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at) AND (o.month >= '2021/08'::text))))
+  GROUP BY o.month, o.customer_id
+  ORDER BY 4 DESC, 6 DESC
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_customer_payment OWNER TO postgres;
+
+--
+-- Name: v_customer_type; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_customer_type AS
+ SELECT '_Tổng'::text AS "Nguồn",
+    o.month AS "Tháng",
+    '1. Khách chung'::text AS "Loại khách hàng",
+    count(DISTINCT o.customer_id) AS "Số khách hàng",
+    count(o.order_id) AS "Số đơn hàng",
+    1 AS "% số đơn hàng",
+    ((count(o.order_id))::numeric / (count(DISTINCT o.customer_id))::numeric) AS "Số đơn trung bình",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Doanh thu",
+    1 AS "% doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ((count(DISTINCT o.customer_id))::numeric)::double precision) AS "Doanh thu trung bình",
+    sum(o.refund_amount) AS "Refund",
+    1 AS "% refund",
+    (sum(o.refund_amount) / ((count(DISTINCT o.customer_id))::numeric)::double precision) AS "Refund trung bình"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at))))
+  GROUP BY o.month
+UNION
+ SELECT o.customer_source AS "Nguồn",
+    o.month AS "Tháng",
+    '1. Khách chung'::text AS "Loại khách hàng",
+    count(DISTINCT o.customer_id) AS "Số khách hàng",
+    count(o.order_id) AS "Số đơn hàng",
+    ((count(o.order_id))::numeric / (( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE (orderdetails.month = o.month)))::numeric) AS "% số đơn hàng",
+    ((count(o.order_id))::numeric / (count(DISTINCT o.customer_id))::numeric) AS "Số đơn trung bình",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ( SELECT sum(
+                CASE
+                    WHEN (o1.month < '2021/08'::text) THEN (o1.paid_amount)::double precision
+                    ELSE br1.receiced_amount
+                END) AS sum
+           FROM (data.orderdetails o1
+             LEFT JOIN data.v_transaction_breakdown br1 ON (((o1.order_id = br1.order_id) AND (o1.created_at = br1.created_at))))
+          WHERE (o1.month = o.month))) AS "% doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ((count(DISTINCT o.customer_id))::numeric)::double precision) AS "Doanh thu trung bình",
+    sum(o.refund_amount) AS "Refund",
+    (sum(o.refund_amount) / ( SELECT sum(orderdetails.refund_amount) AS sum
+           FROM data.orderdetails
+          WHERE (orderdetails.month = o.month))) AS "% refund",
+    (sum(o.refund_amount) / ((count(DISTINCT o.customer_id))::numeric)::double precision) AS "Refund trung bình"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at))))
+  GROUP BY o.month, o.customer_source
+ HAVING (count(DISTINCT o.customer_id) > 0)
+UNION
+ SELECT '_Tổng'::text AS "Nguồn",
+    o.month AS "Tháng",
+    '3. Khách quay lại'::text AS "Loại khách hàng",
+    count(DISTINCT o.customer_id) AS "Số khách hàng",
+    count(o.order_id) AS "Số đơn hàng",
+    ((count(o.order_id))::numeric / (( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE (orderdetails.month = o.month)))::numeric) AS "% số đơn hàng",
+    ((count(o.order_id))::numeric / (count(DISTINCT o.customer_id))::numeric) AS "Số đơn trung bình",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ( SELECT sum(
+                CASE
+                    WHEN (o1.month < '2021/08'::text) THEN (o1.paid_amount)::double precision
+                    ELSE br1.receiced_amount
+                END) AS sum
+           FROM (data.orderdetails o1
+             LEFT JOIN data.v_transaction_breakdown br1 ON (((o1.order_id = br1.order_id) AND (o1.created_at = br1.created_at))))
+          WHERE (o1.month = o.month))) AS "% doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ((count(DISTINCT o.customer_id))::numeric)::double precision) AS "Doanh thu trung bình",
+    sum(o.refund_amount) AS "Refund",
+    (sum(o.refund_amount) / ( SELECT sum(orderdetails.refund_amount) AS sum
+           FROM data.orderdetails
+          WHERE (orderdetails.month = o.month))) AS "% refund",
+    (sum(o.refund_amount) / ((count(DISTINCT o.customer_id))::numeric)::double precision) AS "Refund trung bình"
+   FROM ((data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at))))
+     LEFT JOIN data.v_customer_type_clean cs ON (((o.customer_id = cs.customer_id) AND (o.month = cs.month))))
+  WHERE ((cs.cus_type ~~ '4.%'::text) OR (cs.cus_type ~~ '5.%'::text))
+  GROUP BY o.month
+UNION
+ SELECT o.customer_source AS "Nguồn",
+    o.month AS "Tháng",
+    '3. Khách quay lại'::text AS "Loại khách hàng",
+    count(DISTINCT o.customer_id) AS "Số khách hàng",
+    count(o.order_id) AS "Số đơn hàng",
+    ((count(o.order_id))::numeric / (( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE (orderdetails.month = o.month)))::numeric) AS "% số đơn hàng",
+    ((count(o.order_id))::numeric / (count(DISTINCT o.customer_id))::numeric) AS "Số đơn trung bình",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ( SELECT sum(
+                CASE
+                    WHEN (o1.month < '2021/08'::text) THEN (o1.paid_amount)::double precision
+                    ELSE br1.receiced_amount
+                END) AS sum
+           FROM (data.orderdetails o1
+             LEFT JOIN data.v_transaction_breakdown br1 ON (((o1.order_id = br1.order_id) AND (o1.created_at = br1.created_at))))
+          WHERE (o1.month = o.month))) AS "% doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ((count(DISTINCT o.customer_id))::numeric)::double precision) AS "Doanh thu trung bình",
+    sum(o.refund_amount) AS "Refund",
+    (sum(o.refund_amount) / ( SELECT sum(orderdetails.refund_amount) AS sum
+           FROM data.orderdetails
+          WHERE (orderdetails.month = o.month))) AS "% refund",
+    (sum(o.refund_amount) / ((count(DISTINCT o.customer_id))::numeric)::double precision) AS "Refund trung bình"
+   FROM ((data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at))))
+     LEFT JOIN data.v_customer_type_clean cs ON (((o.customer_id = cs.customer_id) AND (o.month = cs.month))))
+  WHERE ((cs.cus_type ~~ '4.%'::text) OR (cs.cus_type ~~ '5.%'::text))
+  GROUP BY o.month, o.customer_source
+ HAVING (count(DISTINCT o.customer_id) > 0)
+UNION
+ SELECT '_Tổng'::text AS "Nguồn",
+    o.month AS "Tháng",
+    cs.cus_type AS "Loại khách hàng",
+    count(DISTINCT o.customer_id) AS "Số khách hàng",
+    count(o.order_parent_id) AS "Số đơn hàng",
+    ((count(o.order_parent_id))::numeric / (( SELECT count(orderdetails.order_parent_id) AS count
+           FROM data.orderdetails
+          WHERE (orderdetails.month = o.month)))::numeric) AS "% số đơn hàng",
+    ((count(o.order_parent_id))::numeric / (count(DISTINCT o.customer_id))::numeric) AS "Số đơn trung bình",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ( SELECT sum(
+                CASE
+                    WHEN (o1.month < '2021/08'::text) THEN (o1.paid_amount)::double precision
+                    ELSE br1.receiced_amount
+                END) AS sum
+           FROM (data.orderdetails o1
+             LEFT JOIN data.v_transaction_breakdown br1 ON (((o1.order_id = br1.order_id) AND (o1.created_at = br1.created_at))))
+          WHERE (o1.month = o.month))) AS "% doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ((count(DISTINCT o.customer_id))::numeric)::double precision) AS "Doanh thu trung bình",
+    sum(o.refund_amount) AS "Refund",
+    (sum(o.refund_amount) / ( SELECT sum(orderdetails.refund_amount) AS sum
+           FROM data.orderdetails
+          WHERE (orderdetails.month = o.month))) AS "% refund",
+    (sum(o.refund_amount) / ((count(DISTINCT o.customer_id))::numeric)::double precision) AS "Refund trung bình"
+   FROM ((data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at))))
+     LEFT JOIN data.v_customer_type_clean cs ON (((o.customer_id = cs.customer_id) AND (o.month = cs.month))))
+  GROUP BY o.month, cs.cus_type
+ HAVING (count(DISTINCT o.customer_id) > 0)
+UNION
+ SELECT o.customer_source AS "Nguồn",
+    o.month AS "Tháng",
+    cs.cus_type AS "Loại khách hàng",
+    count(DISTINCT o.customer_id) AS "Số khách hàng",
+    count(o.order_parent_id) AS "Số đơn hàng",
+    ((count(o.order_parent_id))::numeric / (( SELECT count(orderdetails.order_parent_id) AS count
+           FROM data.orderdetails
+          WHERE (orderdetails.month = o.month)))::numeric) AS "% số đơn hàng",
+    ((count(o.order_parent_id))::numeric / (count(DISTINCT o.customer_id))::numeric) AS "Số đơn trung bình",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ( SELECT sum(
+                CASE
+                    WHEN (o1.month < '2021/08'::text) THEN (o1.paid_amount)::double precision
+                    ELSE br1.receiced_amount
+                END) AS sum
+           FROM (data.orderdetails o1
+             LEFT JOIN data.v_transaction_breakdown br1 ON (((o1.order_id = br1.order_id) AND (o1.created_at = br1.created_at))))
+          WHERE (o1.month = o.month))) AS "% doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ((count(DISTINCT o.customer_id))::numeric)::double precision) AS "Doanh thu trung bình",
+    sum(o.refund_amount) AS "Refund",
+    (sum(o.refund_amount) / ( SELECT sum(orderdetails.refund_amount) AS sum
+           FROM data.orderdetails
+          WHERE (orderdetails.month = o.month))) AS "% refund",
+    (sum(o.refund_amount) / ((count(DISTINCT o.customer_id))::numeric)::double precision) AS "Refund trung bình"
+   FROM ((data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at))))
+     LEFT JOIN data.v_customer_type_clean cs ON (((o.customer_id = cs.customer_id) AND (o.month = cs.month))))
+  GROUP BY o.month, o.customer_source, cs.cus_type
+ HAVING (count(DISTINCT o.customer_id) > 0)
+  ORDER BY 2 DESC, 1, 3
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_customer_type OWNER TO postgres;
+
+--
+-- Name: v_hr_view; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_hr_view AS
+ WITH cte_total AS (
+         SELECT o.month,
+            o.hr_id,
+            count(o.order_id) AS total_order,
+            sum(o.total_amount) AS total_amount,
+            sum(o.paid_amount) AS paid_amount,
+            sum(
+                CASE
+                    WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+                    ELSE br.receiced_amount
+                END) AS received_amount,
+            sum(o.refund_amount) AS refund_amount
+           FROM (data.orderdetails o
+             LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at) AND (o.month >= '2021/08'::text))))
+          WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+          GROUP BY o.month, o.hr_id
+        ), cte_refund AS (
+         SELECT orderdetails.month,
+            orderdetails.hr_id,
+            count(orderdetails.order_id) AS refund_order
+           FROM data.orderdetails
+          WHERE (orderdetails.order_status = 'Refund'::text)
+          GROUP BY orderdetails.month, orderdetails.hr_id
+        ), cte_misdeadline AS (
+         SELECT orderdetails.month,
+            orderdetails.hr_id,
+            count(orderdetails.order_id) AS misdl_order,
+            sum(orderdetails.total_amount) AS misdl_amount
+           FROM data.orderdetails
+          WHERE (orderdetails.deadline_status = 'Misdeadline'::text)
+          GROUP BY orderdetails.month, orderdetails.hr_id
+        )
+ SELECT c1.hr_id AS "HR",
+    '_Tổng'::text AS "Tháng",
+    sum(c1.total_order) AS "Tổng số đơn",
+    sum(c1.total_amount) AS "Tổng giá trị đơn hàng",
+    sum(c1.paid_amount) AS "Tổng số tiền đã nhận",
+    sum(c1.received_amount) AS "Tổng số tiền thực nhận",
+    sum(c2.refund_order) AS "Tổng số đơn refund",
+    (sum((c2.refund_order)::numeric) / sum((c1.total_order)::numeric)) AS "% số đơn refund",
+    sum(c1.refund_amount) AS "Tổng số tiền refund",
+    (sum((c1.refund_amount)::numeric) / sum((c1.total_amount)::numeric)) AS "% số tiền refund",
+    sum(c3.misdl_order) AS "Tổng số đơn misdeadline",
+    (sum((c3.misdl_order)::numeric) / sum((c1.total_order)::numeric)) AS "% số đơn misdeadline",
+    sum(c3.misdl_amount) AS "Tổng số tiền misdeadline",
+    (sum((c3.misdl_amount)::numeric) / sum((c1.total_amount)::numeric)) AS "% số tiền misdeadline"
+   FROM ((cte_total c1
+     LEFT JOIN cte_refund c2 ON (((c1.month = c2.month) AND (c1.hr_id = c2.hr_id))))
+     LEFT JOIN cte_misdeadline c3 ON (((c1.month = c3.month) AND (c1.hr_id = c3.hr_id))))
+  GROUP BY c1.hr_id
+UNION
+ SELECT c1.hr_id AS "HR",
+    c1.month AS "Tháng",
+    c1.total_order AS "Tổng số đơn",
+    c1.total_amount AS "Tổng giá trị đơn hàng",
+    c1.paid_amount AS "Tổng số tiền đã nhận",
+    c1.received_amount AS "Tổng số tiền thực nhận",
+    c2.refund_order AS "Tổng số đơn refund",
+    ((c2.refund_order)::numeric / (c1.total_order)::numeric) AS "% số đơn refund",
+    c1.refund_amount AS "Tổng số tiền refund",
+    ((c1.refund_amount)::numeric / (c1.total_amount)::numeric) AS "% số tiền refund",
+    c3.misdl_order AS "Tổng số đơn misdeadline",
+    ((c3.misdl_order)::numeric / (c1.total_order)::numeric) AS "% số đơn misdeadline",
+    c3.misdl_amount AS "Tổng số tiền misdeadline",
+    ((c3.misdl_amount)::numeric / (c1.total_amount)::numeric) AS "% số tiền misdeadline"
+   FROM ((cte_total c1
+     LEFT JOIN cte_refund c2 ON (((c1.month = c2.month) AND (c1.hr_id = c2.hr_id))))
+     LEFT JOIN cte_misdeadline c3 ON (((c1.month = c3.month) AND (c1.hr_id = c3.hr_id))))
+  ORDER BY 1 DESC, 2
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_hr_view OWNER TO postgres;
+
+--
+-- Name: v_petty_expenses; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_petty_expenses AS
+ SELECT p.month,
+    p.source,
+    p.category,
+    initcap(p.type) AS type,
+    sum((((p.spend)::double precision + (p.collect)::double precision) / c.rate)) AS sum
+   FROM (data.petty_expenses p
+     LEFT JOIN data.currencies c ON ((lower(p.currency) = lower((c.iso)::text))))
+  WHERE (p.source <> '_Tổng'::text)
+  GROUP BY p.month, p.source, p.category, (initcap(p.type))
+UNION
+ SELECT p.month,
+    '_Tổng'::text AS source,
+    p.category,
+    initcap(p.type) AS type,
+    sum((((p.spend)::double precision + (p.collect)::double precision) / c.rate)) AS sum
+   FROM (data.petty_expenses p
+     LEFT JOIN data.currencies c ON ((lower(p.currency) = lower((c.iso)::text))))
+  GROUP BY p.month, p.category, (initcap(p.type))
+UNION
+ SELECT p.month,
+    '_Tổng'::text AS source,
+    p.category,
+    concat('1. ', p.category) AS type,
+    sum((((p.spend)::double precision + (p.collect)::double precision) / c.rate)) AS sum
+   FROM (data.petty_expenses p
+     LEFT JOIN data.currencies c ON ((lower(p.currency) = lower((c.iso)::text))))
+  GROUP BY p.month, p.category
+UNION
+ SELECT p.month,
+    p.source,
+    p.category,
+    concat('1. ', p.category) AS type,
+    sum((((p.spend)::double precision + (p.collect)::double precision) / c.rate)) AS sum
+   FROM (data.petty_expenses p
+     LEFT JOIN data.currencies c ON ((lower(p.currency) = lower((c.iso)::text))))
+  WHERE (p.source <> '_Tổng'::text)
+  GROUP BY p.month, p.category, p.source
+  ORDER BY 1 DESC, 2, 3, 4
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_petty_expenses OWNER TO postgres;
+
+--
+-- Name: v_revenue; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_revenue AS
+ SELECT '_Tổng'::text AS "Nguồn",
+    o.month AS "Tháng",
+    count(o.order_id) AS "Tổng số đơn",
+    sum(o.total_amount) AS "Tổng giá trị đơn hàng",
+    sum(o.discount_amount) AS "Tổng giảm giá",
+    sum(o.paid_amount) AS "Tổng doanh thu đã nhận",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Tổng số tiền thực nhận",
+    sum(o.refund_amount) AS "Giá trị refund",
+    sum(
+        CASE
+            WHEN (o.paid_amount < o.refund_amount) THEN (o.paid_amount)::double precision
+            ELSE o.refund_amount
+        END) AS "Số tiền refund thực tế",
+        CASE
+            WHEN (sum(o.refund_amount) IS NULL) THEN sum(
+            CASE
+                WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+                ELSE br.receiced_amount
+            END)
+            ELSE (sum(
+            CASE
+                WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+                ELSE br.receiced_amount
+            END) - sum(
+            CASE
+                WHEN (o.paid_amount < o.refund_amount) THEN (o.paid_amount)::double precision
+                ELSE o.refund_amount
+            END))
+        END AS "Doanh thu thuần",
+    ( SELECT sum(orderdetails.total_amount) AS sum
+           FROM data.orderdetails
+          WHERE ((orderdetails.month = o.month) AND ((orderdetails.order_status = 'Cancel'::text) OR (orderdetails.payment_status = 'Không thanh toán'::text) OR (orderdetails.is_payment = 'Unpaid (paid mới làm)'::text) OR (orderdetails.is_payment = 'Khách left chat'::text)))) AS "Doanh thu bị miss"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at) AND (o.month >= '2021/08'::text))))
+  WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+  GROUP BY o.month
+UNION
+ SELECT o.customer_source AS "Nguồn",
+    o.month AS "Tháng",
+    count(o.order_id) AS "Tổng số đơn",
+    sum(o.total_amount) AS "Tổng giá trị đơn hàng",
+    sum(o.discount_amount) AS "Tổng giảm giá",
+    sum(o.paid_amount) AS "Tổng doanh thu đã nhận",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Tổng số tiền thực nhận",
+    sum(o.refund_amount) AS "Giá trị refund",
+    sum(
+        CASE
+            WHEN (o.paid_amount < o.refund_amount) THEN (o.paid_amount)::double precision
+            ELSE o.refund_amount
+        END) AS "Số tiền refund thực tế",
+        CASE
+            WHEN (sum(o.refund_amount) IS NULL) THEN sum(
+            CASE
+                WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+                ELSE br.receiced_amount
+            END)
+            ELSE (sum(
+            CASE
+                WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+                ELSE br.receiced_amount
+            END) - sum(
+            CASE
+                WHEN (o.paid_amount < o.refund_amount) THEN (o.paid_amount)::double precision
+                ELSE o.refund_amount
+            END))
+        END AS "Doanh thu thuần",
+    ( SELECT sum(orderdetails.total_amount) AS sum
+           FROM data.orderdetails
+          WHERE ((orderdetails.month = o.month) AND ((orderdetails.order_status = 'Cancel'::text) OR (orderdetails.payment_status = 'Không thanh toán'::text) OR (orderdetails.is_payment = 'Unpaid (paid mới làm)'::text) OR (orderdetails.is_payment = 'Khách left chat'::text)) AND (orderdetails.customer_source = o.customer_source))) AS "Doanh thu bị miss"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at) AND (o.month >= '2021/08'::text))))
+  WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+  GROUP BY o.month, o.customer_source
+  ORDER BY 2 DESC, 1
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_revenue OWNER TO postgres;
+
+--
+-- Name: v_revenue_day; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_revenue_day AS
+ SELECT '_Tổng'::text AS "Nguồn",
+    ((o.created_at)::date)::text AS "Ngày",
+    count(o.order_id) AS "Tổng số đơn",
+    sum(o.total_amount) AS "Tổng giá trị đơn hàng",
+    sum(o.discount_amount) AS "Tổng giảm giá",
+    sum(o.paid_amount) AS "Tổng doanh thu đã nhận",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Tổng số tiền thực nhận",
+    sum(o.refund_amount) AS "Giá trị refund",
+    sum(
+        CASE
+            WHEN (o.paid_amount < o.refund_amount) THEN (o.paid_amount)::double precision
+            ELSE o.refund_amount
+        END) AS "Số tiền refund thực tế",
+        CASE
+            WHEN (sum(o.refund_amount) IS NULL) THEN sum(
+            CASE
+                WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+                ELSE br.receiced_amount
+            END)
+            ELSE (sum(
+            CASE
+                WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+                ELSE br.receiced_amount
+            END) - sum(
+            CASE
+                WHEN (o.paid_amount < o.refund_amount) THEN (o.paid_amount)::double precision
+                ELSE o.refund_amount
+            END))
+        END AS "Doanh thu thuần",
+    ( SELECT sum(orderdetails.total_amount) AS sum
+           FROM data.orderdetails
+          WHERE (((orderdetails.created_at)::date = min((o.created_at)::date)) AND ((orderdetails.order_status = 'Cancel'::text) OR (orderdetails.payment_status = 'Không thanh toán'::text) OR (orderdetails.is_payment = 'Unpaid (paid mới làm)'::text) OR (orderdetails.is_payment = 'Khách left chat'::text)))) AS "Doanh thu bị miss"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at) AND (o.month >= '2021/08'::text))))
+  WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+  GROUP BY ((o.created_at)::date)
+UNION
+ SELECT o.customer_source AS "Nguồn",
+    ((o.created_at)::date)::text AS "Ngày",
+    count(o.order_id) AS "Tổng số đơn",
+    sum(o.total_amount) AS "Tổng giá trị đơn hàng",
+    sum(o.discount_amount) AS "Tổng giảm giá",
+    sum(o.paid_amount) AS "Tổng doanh thu đã nhận",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Tổng số tiền thực nhận",
+    sum(o.refund_amount) AS "Giá trị refund",
+    sum(
+        CASE
+            WHEN (o.paid_amount < o.refund_amount) THEN (o.paid_amount)::double precision
+            ELSE o.refund_amount
+        END) AS "Số tiền refund thực tế",
+        CASE
+            WHEN (sum(o.refund_amount) IS NULL) THEN sum(
+            CASE
+                WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+                ELSE br.receiced_amount
+            END)
+            ELSE (sum(
+            CASE
+                WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+                ELSE br.receiced_amount
+            END) - sum(
+            CASE
+                WHEN (o.paid_amount < o.refund_amount) THEN (o.paid_amount)::double precision
+                ELSE o.refund_amount
+            END))
+        END AS "Doanh thu thuần",
+    ( SELECT sum(orderdetails.total_amount) AS sum
+           FROM data.orderdetails
+          WHERE (((orderdetails.created_at)::date = min((o.created_at)::date)) AND ((orderdetails.order_status = 'Cancel'::text) OR (orderdetails.payment_status = 'Không thanh toán'::text) OR (orderdetails.is_payment = 'Unpaid (paid mới làm)'::text) OR (orderdetails.is_payment = 'Khách left chat'::text)) AND (orderdetails.customer_source = o.customer_source))) AS "Doanh thu bị miss"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at) AND (o.month >= '2021/08'::text))))
+  WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+  GROUP BY ((o.created_at)::date), o.customer_source
+  ORDER BY 2 DESC, 1
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_revenue_day OWNER TO postgres;
+
+--
+-- Name: v_sales_view; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_sales_view AS
+ SELECT o.created_by AS "Sales",
+    '_Tổng'::text AS "Tháng",
+    ( SELECT count(DISTINCT orderdetails.customer_id) AS count
+           FROM data.orderdetails
+          WHERE (orderdetails.created_by = o.created_by)) AS "Tổng số khách đã care",
+    count(DISTINCT o.customer_id) AS "Tổng số khách care trong tháng",
+    ( SELECT count(DISTINCT orderdetails.customer_id) AS count
+           FROM (data.orderdetails
+             LEFT JOIN data.v_customer_type_clean cs ON (((orderdetails.customer_id = cs.customer_id) AND (orderdetails.month = cs.month))))
+          WHERE ((orderdetails.created_by = o.created_by) AND ((cs.cus_type ~~ '4.%'::text) OR (cs.cus_type ~~ '5.%'::text)))) AS "Số khách quay lại",
+    ( SELECT count(DISTINCT orderdetails.customer_id) AS count
+           FROM (data.orderdetails
+             LEFT JOIN data.v_customer_type_clean cs ON (((orderdetails.customer_id = cs.customer_id) AND (orderdetails.month = cs.month))))
+          WHERE ((orderdetails.created_by = o.created_by) AND (cs.cus_type ~~ '4.%'::text))) AS "Số khách trung thành",
+    count(o.order_id) AS "Tổng số đơn",
+    sum(o.total_amount) AS "Tổng giá trị đơn hàng",
+    sum(o.paid_amount) AS "Tổng doanh thu",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Tổng doanh thu thực nhận",
+    ( SELECT sum(orderdetails.paid_amount) AS sum
+           FROM (data.orderdetails
+             LEFT JOIN data.v_customer_type_clean cs ON (((orderdetails.customer_id = cs.customer_id) AND (orderdetails.month = cs.month))))
+          WHERE ((orderdetails.created_by = o.created_by) AND ((cs.cus_type ~~ '4.%'::text) OR (cs.cus_type ~~ '5.%'::text)))) AS "Doanh thu từ khách quay lại",
+    ( SELECT sum(orderdetails.paid_amount) AS sum
+           FROM (data.orderdetails
+             LEFT JOIN data.v_customer_type_clean cs ON (((orderdetails.customer_id = cs.customer_id) AND (orderdetails.month = cs.month))))
+          WHERE ((orderdetails.created_by = o.created_by) AND (cs.cus_type ~~ '4.%'::text))) AS "Doanh thu từ khách trung thành",
+    sum(o.refund_amount) AS "Refund",
+    ( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE ((orderdetails.created_by = o.created_by) AND ((orderdetails.order_status = 'Cancel'::text) OR (orderdetails.payment_status = 'Không thanh toán'::text) OR (orderdetails.is_payment = 'Unpaid (paid mới làm)'::text) OR (orderdetails.is_payment = 'Khách left chat'::text)))) AS "Số đơn miss",
+    ( SELECT sum(orderdetails.total_amount) AS sum
+           FROM data.orderdetails
+          WHERE ((orderdetails.created_by = o.created_by) AND ((orderdetails.order_status = 'Cancel'::text) OR (orderdetails.payment_status = 'Không thanh toán'::text) OR (orderdetails.is_payment = 'Unpaid (paid mới làm)'::text) OR (orderdetails.is_payment = 'Khách left chat'::text)))) AS "Doanh thu miss"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at) AND (o.month >= '2021/08'::text))))
+  WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+  GROUP BY o.created_by
+UNION
+ SELECT o.created_by AS "Sales",
+    o.month AS "Tháng",
+    ( SELECT count(DISTINCT orderdetails.customer_id) AS count
+           FROM data.orderdetails
+          WHERE ((orderdetails.created_by = o.created_by) AND (orderdetails.month <= o.month))) AS "Tổng số khách đã care",
+    count(DISTINCT o.customer_id) AS "Tổng số khách care trong tháng",
+    ( SELECT count(DISTINCT orderdetails.customer_id) AS count
+           FROM (data.orderdetails
+             LEFT JOIN data.v_customer_type_clean cs ON (((orderdetails.customer_id = cs.customer_id) AND (orderdetails.month = cs.month))))
+          WHERE ((orderdetails.created_by = o.created_by) AND (orderdetails.month = o.month) AND ((cs.cus_type ~~ '4.%'::text) OR (cs.cus_type ~~ '5.%'::text)))) AS "Số khách quay lại",
+    ( SELECT count(DISTINCT orderdetails.customer_id) AS count
+           FROM (data.orderdetails
+             LEFT JOIN data.v_customer_type_clean cs ON (((orderdetails.customer_id = cs.customer_id) AND (orderdetails.month = cs.month))))
+          WHERE ((orderdetails.created_by = o.created_by) AND (orderdetails.month = o.month) AND (cs.cus_type ~~ '4.%'::text))) AS "Số khách trung thành",
+    count(DISTINCT o.order_parent_id) AS "Tổng số đơn",
+    sum(o.total_amount) AS "Tổng giá trị đơn hàng",
+    sum(o.paid_amount) AS "Tổng doanh thu",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Tổng doanh thu thực nhận",
+    ( SELECT sum(orderdetails.paid_amount) AS sum
+           FROM (data.orderdetails
+             LEFT JOIN data.v_customer_type_clean cs ON (((orderdetails.customer_id = cs.customer_id) AND (orderdetails.month = cs.month))))
+          WHERE ((orderdetails.created_by = o.created_by) AND (orderdetails.month = o.month) AND ((cs.cus_type ~~ '4.%'::text) OR (cs.cus_type ~~ '5.%'::text)))) AS "Doanh thu từ khách quay lại",
+    ( SELECT sum(orderdetails.paid_amount) AS sum
+           FROM (data.orderdetails
+             LEFT JOIN data.v_customer_type_clean cs ON (((orderdetails.customer_id = cs.customer_id) AND (orderdetails.month = cs.month))))
+          WHERE ((orderdetails.created_by = o.created_by) AND (orderdetails.month = o.month) AND (cs.cus_type ~~ '4.%'::text))) AS "Doanh thu từ khách trung thành",
+    sum(o.refund_amount) AS "Refund",
+    ( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE ((orderdetails.created_by = o.created_by) AND (orderdetails.month = o.month) AND ((orderdetails.order_status = 'Cancel'::text) OR (orderdetails.payment_status = 'Không thanh toán'::text) OR (orderdetails.is_payment = 'Unpaid (paid mới làm)'::text) OR (orderdetails.is_payment = 'Khách left chat'::text)))) AS "Số đơn miss",
+    ( SELECT sum(orderdetails.total_amount) AS sum
+           FROM data.orderdetails
+          WHERE ((orderdetails.created_by = o.created_by) AND (orderdetails.month = o.month) AND ((orderdetails.order_status = 'Cancel'::text) OR (orderdetails.payment_status = 'Không thanh toán'::text) OR (orderdetails.is_payment = 'Unpaid (paid mới làm)'::text) OR (orderdetails.is_payment = 'Khách left chat'::text)))) AS "Doanh thu miss"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at) AND (o.month >= '2021/08'::text))))
+  WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+  GROUP BY o.month, o.created_by
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_sales_view OWNER TO postgres;
+
+--
+-- Name: v_shareholders; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_shareholders AS
+ SELECT o.month AS "Tháng",
+    '1. Gộp'::text AS "Chỉ tiêu",
+    'Gộp'::text AS "Chỉ tiêu con",
+    count(o.order_id) AS "Tổng số đơn",
+    1 AS "% số đơn",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Doanh thu",
+    1 AS "% doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / (count(o.order_id))::double precision) AS "Doanh thu / số đơn",
+    ( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE ((orderdetails.month = o.month) AND (orderdetails.order_status = 'Refund'::text))) AS "Số đơn refund",
+    sum(o.refund_amount) AS "Giá trị refund"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at))))
+  WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+  GROUP BY o.month
+UNION
+( SELECT o.month AS "Tháng",
+    '5. Môn'::text AS "Chỉ tiêu",
+    o.subject AS "Chỉ tiêu con",
+    count(o.order_id) AS "Tổng số đơn",
+    ((count(o.order_id))::numeric / (( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE (((orderdetails.month = o.month) AND (orderdetails.paid_amount > (0)::double precision)) OR (orderdetails.is_payment = 'Unpaid (vẫn làm)'::text))))::numeric) AS "% số đơn",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ( SELECT sum(
+                CASE
+                    WHEN (o1.month < '2021/08'::text) THEN (o1.paid_amount)::double precision
+                    ELSE br1.receiced_amount
+                END) AS sum
+           FROM (data.orderdetails o1
+             LEFT JOIN data.v_transaction_breakdown br1 ON (((o1.order_id = br1.order_id) AND (o1.created_at = br1.created_at))))
+          WHERE (((o1.month = o.month) AND (o1.paid_amount > (0)::double precision)) OR (o1.is_payment = 'Unpaid (vẫn làm)'::text)))) AS "% doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / (count(o.order_id))::double precision) AS "Doanh thu / số đơn",
+    ( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE ((orderdetails.month = o.month) AND (orderdetails.order_status = 'Refund'::text) AND (orderdetails.subject = o.subject))) AS "Số đơn refund",
+    sum(o.refund_amount) AS "Giá trị refund"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at))))
+  WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+  GROUP BY o.month, o.subject
+  ORDER BY o.month DESC, (count(o.order_id)) DESC)
+UNION
+( SELECT o.month AS "Tháng",
+    '2. Refund'::text AS "Chỉ tiêu",
+    o.refund_reason AS "Chỉ tiêu con",
+    count(o.order_id) AS "Tổng số đơn",
+    ((count(o.order_id))::numeric / (( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE (((orderdetails.month = o.month) AND (orderdetails.paid_amount > (0)::double precision)) OR (orderdetails.is_payment = 'Unpaid (vẫn làm)'::text))))::numeric) AS "% số đơn",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ( SELECT sum(
+                CASE
+                    WHEN (o1.month < '2021/08'::text) THEN (o1.paid_amount)::double precision
+                    ELSE br1.receiced_amount
+                END) AS sum
+           FROM (data.orderdetails o1
+             LEFT JOIN data.v_transaction_breakdown br1 ON (((o1.order_id = br1.order_id) AND (o1.created_at = br1.created_at))))
+          WHERE (((o1.month = o.month) AND (o1.paid_amount > (0)::double precision)) OR (o1.is_payment = 'Unpaid (vẫn làm)'::text)))) AS "% doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / (count(o.order_id))::double precision) AS "Doanh thu / số đơn",
+    ( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE ((orderdetails.month = o.month) AND (orderdetails.order_status = 'Refund'::text) AND (orderdetails.refund_reason = o.refund_reason))) AS "Số đơn refund",
+    sum(o.refund_amount) AS "Giá trị refund"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at))))
+  WHERE (o.order_status = 'Refund'::text)
+  GROUP BY o.month, o.refund_reason
+  ORDER BY o.month DESC, (count(o.order_id)) DESC)
+UNION
+( SELECT o.month AS "Tháng",
+    '3. Deadline'::text AS "Chỉ tiêu",
+    o.deadline_status AS "Chỉ tiêu con",
+    count(o.order_id) AS "Tổng số đơn",
+    ((count(o.order_id))::numeric / (( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE (((orderdetails.month = o.month) AND (orderdetails.paid_amount > (0)::double precision)) OR (orderdetails.is_payment = 'Unpaid (vẫn làm)'::text))))::numeric) AS "% số đơn",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ( SELECT sum(
+                CASE
+                    WHEN (o1.month < '2021/08'::text) THEN (o1.paid_amount)::double precision
+                    ELSE br1.receiced_amount
+                END) AS sum
+           FROM (data.orderdetails o1
+             LEFT JOIN data.v_transaction_breakdown br1 ON (((o1.order_id = br1.order_id) AND (o1.created_at = br1.created_at))))
+          WHERE (((o1.month = o.month) AND (o1.paid_amount > (0)::double precision)) OR (o1.is_payment = 'Unpaid (vẫn làm)'::text)))) AS "% doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / (count(o.order_id))::double precision) AS "Doanh thu / số đơn",
+    ( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE ((orderdetails.month = o.month) AND (orderdetails.order_status = 'Refund'::text) AND (orderdetails.deadline_status = o.deadline_status))) AS "Số đơn refund",
+    sum(o.refund_amount) AS "Giá trị refund"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at))))
+  WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+  GROUP BY o.month, o.deadline_status
+  ORDER BY o.month DESC, (count(o.order_id)) DESC)
+UNION
+( SELECT o.month AS "Tháng",
+    '4.Loại bài tập'::text AS "Chỉ tiêu",
+    o.exercise_type AS "Chỉ tiêu con",
+    count(o.order_id) AS "Tổng số đơn",
+    ((count(o.order_id))::numeric / (( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE (((orderdetails.month = o.month) AND (orderdetails.paid_amount > (0)::double precision)) OR (orderdetails.is_payment = 'Unpaid (vẫn làm)'::text))))::numeric) AS "% số đơn",
+    sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) AS "Doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / ( SELECT sum(
+                CASE
+                    WHEN (o1.month < '2021/08'::text) THEN (o1.paid_amount)::double precision
+                    ELSE br1.receiced_amount
+                END) AS sum
+           FROM (data.orderdetails o1
+             LEFT JOIN data.v_transaction_breakdown br1 ON (((o1.order_id = br1.order_id) AND (o1.created_at = br1.created_at))))
+          WHERE (((o1.month = o.month) AND (o1.paid_amount > (0)::double precision)) OR (o1.is_payment = 'Unpaid (vẫn làm)'::text)))) AS "% doanh thu",
+    (sum(
+        CASE
+            WHEN (o.month < '2021/08'::text) THEN (o.paid_amount)::double precision
+            ELSE br.receiced_amount
+        END) / (count(o.order_id))::double precision) AS "Doanh thu / số đơn",
+    ( SELECT count(orderdetails.order_id) AS count
+           FROM data.orderdetails
+          WHERE ((orderdetails.month = o.month) AND (orderdetails.order_status = 'Refund'::text) AND (orderdetails.exercise_type = o.exercise_type))) AS "Số đơn refund",
+    sum(o.refund_amount) AS "Giá trị refund"
+   FROM (data.orderdetails o
+     LEFT JOIN data.v_transaction_breakdown br ON (((o.order_id = br.order_id) AND (o.created_at = br.created_at))))
+  WHERE ((o.paid_amount > (0)::double precision) OR (o.is_payment = 'Unpaid (vẫn làm)'::text))
+  GROUP BY o.month, o.exercise_type
+  ORDER BY o.month DESC, (count(o.order_id)) DESC)
+  ORDER BY 1 DESC, 2, 4 DESC
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_shareholders OWNER TO postgres;
+
+--
+-- Name: v_transaction_cost; Type: MATERIALIZED VIEW; Schema: data; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW data.v_transaction_cost AS
+ SELECT concat(to_char(t.created_at, 'YYYY'::text), to_char(t.created_at, 'MM'::text)) AS month,
+    sum(((t.transaction_cost)::double precision / c.rate)) AS "Phí giao dịch"
+   FROM (data.transaction t
+     LEFT JOIN data.currencies c ON ((lower(t.cost_currency) = lower((c.iso)::text))))
+  GROUP BY (concat(to_char(t.created_at, 'YYYY'::text), to_char(t.created_at, 'MM'::text)))
+ HAVING (sum(((t.transaction_cost)::double precision / c.rate)) > (0)::double precision)
+  ORDER BY (concat(to_char(t.created_at, 'YYYY'::text), to_char(t.created_at, 'MM'::text))) DESC
+  WITH NO DATA;
+
+
+ALTER TABLE data.v_transaction_cost OWNER TO postgres;
+
+--
+-- Name: vps_backlink; Type: TABLE; Schema: data; Owner: postgres
+--
+
+CREATE TABLE data.vps_backlink (
+    month text,
+    vps numeric,
+    backlink numeric,
+    vps_tien_dat numeric,
+    vps_tien_go numeric,
+    vps_tien_dat_gop numeric,
+    vps_tien_go_gop numeric,
+    backlink_tien_dat numeric,
+    backlink_tien_go numeric,
+    backlink_tien_dat_gop numeric,
+    backlink_tien_go_gop numeric,
+    id uuid,
+    updatetime timestamp without time zone
+);
+
+
+ALTER TABLE data.vps_backlink OWNER TO postgres;
+
+--
+-- Name: vv_customer_type_clean; Type: VIEW; Schema: data; Owner: postgres
+--
+
+CREATE VIEW data.vv_customer_type_clean AS
+ WITH min_date AS (
+         SELECT orderdetails.customer_id,
+            min(orderdetails.month) AS min_date
+           FROM data.orderdetails
+          GROUP BY orderdetails.customer_id
+        ), used_month AS (
+         SELECT o.customer_id,
+            o.month,
+            ( SELECT count(DISTINCT orderdetails.month) AS count
+                   FROM data.orderdetails
+                  WHERE ((orderdetails.customer_id = o.customer_id) AND (orderdetails.month <= o.month))) AS used_month,
+            ( SELECT sum(orderdetails.paid_amount) AS sum
+                   FROM data.orderdetails
+                  WHERE ((orderdetails.customer_id = o.customer_id) AND (orderdetails.month <= o.month))) AS paid_amount,
+            ((((split_part(o.month, '/'::text, 1))::numeric - (split_part(min(mi.min_date), '/'::text, 1))::numeric) * (12)::numeric) + (((split_part(o.month, '/'::text, 2))::numeric - (split_part(min(mi.min_date), '/'::text, 2))::numeric) + (1)::numeric)) AS total_month
+           FROM (data.orderdetails o
+             LEFT JOIN min_date mi ON (((o.customer_id = mi.customer_id) AND ((mi.customer_id <> ''::text) OR (mi.customer_id IS NOT NULL)))))
+          GROUP BY o.customer_id, o.month
+        ), overall AS (
+         SELECT u.customer_id,
+            u.month,
+            u.used_month,
+            u.paid_amount,
+            u.total_month,
+            mi.min_date
+           FROM (used_month u
+             LEFT JOIN min_date mi ON (((u.customer_id = mi.customer_id) AND ((mi.customer_id <> ''::text) OR (mi.customer_id IS NOT NULL)))))
+        )
+ SELECT overall.customer_id,
+    overall.month,
+        CASE
+            WHEN ((overall.paid_amount = (0)::double precision) OR (overall.paid_amount IS NULL)) THEN '6. Khách để miss'::text
+            WHEN ((overall.total_month >= (3)::numeric) AND (((overall.used_month)::numeric / overall.total_month) > 0.8)) THEN '4. Khách trung thành'::text
+            WHEN (overall.month > overall.min_date) THEN '5. Khách quay lại khác'::text
+            WHEN (overall.month = overall.min_date) THEN '2. Khách mới'::text
+            ELSE '7. Blank'::text
+        END AS cus_type
+   FROM overall;
+
+
+ALTER TABLE data.vv_customer_type_clean OWNER TO postgres;
+
+--
+-- Name: vv_transaction_breakdown; Type: VIEW; Schema: data; Owner: postgres
+--
+
+CREATE VIEW data.vv_transaction_breakdown AS
+ WITH tran AS (
+         SELECT tr_1.order_parent_id,
+            sum(((tr_1.total_amount)::double precision / c.rate)) AS trans
+           FROM (data.transaction tr_1
+             LEFT JOIN data.currencies c ON ((lower(tr_1.payment_currency) = lower((c.iso)::text))))
+          WHERE (tr_1.payment_type !~~ '%efund%'::text)
+          GROUP BY tr_1.order_parent_id
+        ), total AS (
+         SELECT orderdetails.order_parent_id,
+            sum(orderdetails.total_amount) AS total
+           FROM data.orderdetails
+          GROUP BY orderdetails.order_parent_id
+        )
+ SELECT o.order_id,
+    o.created_at,
+    o.order_parent_id,
+    o.total_amount,
+    t.total AS total_parent,
+    tr.trans,
+        CASE
+            WHEN ((t.total IS NULL) OR (t.total = (0)::double precision)) THEN NULL::double precision
+            ELSE ((o.total_amount * tr.trans) / t.total)
+        END AS receiced_amount
+   FROM ((data.orderdetails o
+     LEFT JOIN total t ON (((o.order_parent_id = t.order_parent_id) AND (t.order_parent_id IS NOT NULL))))
+     LEFT JOIN tran tr ON (((o.order_parent_id = tr.order_parent_id) AND (tr.order_parent_id IS NOT NULL) AND (tr.order_parent_id <> ''::text))))
+  ORDER BY o.order_id;
+
+
+ALTER TABLE data.vv_transaction_breakdown OWNER TO postgres;
+
+--
+-- Name: clean_creater; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.clean_creater (
+    id uuid,
+    creater_id text,
+    updated_at timestamp without time zone,
+    creater_short_name text,
+    hr_id text,
+    creater_name text,
+    creater_long_name text,
+    creater_mail text,
+    creater_year text,
+    study_at text,
+    ielts_writing_score text,
+    creater_feild text,
+    creater_bank_account text,
+    creater_bank text,
+    cv_link text,
+    creater_status text,
+    creater_evaluate text,
+    note text,
+    etl integer
+);
+
+
+ALTER TABLE etl.clean_creater OWNER TO postgres;
+
+--
+-- Name: clean_creaters2; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.clean_creaters2 (
+    created_at timestamp without time zone,
+    hr text,
+    short_name text,
+    name text,
+    phone text,
+    study_at text,
+    ielts_score text,
+    fields text,
+    cv text,
+    esay text,
+    hours_active text,
+    hours_note text,
+    note text,
+    check_status text,
+    status text,
+    updated_at timestamp without time zone,
+    long_name text,
+    id text,
+    etl smallint DEFAULT 0,
+    db_id uuid
+);
+
+
+ALTER TABLE etl.clean_creaters2 OWNER TO postgres;
+
+--
+-- Name: clean_customer; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.clean_customer (
+    id uuid,
+    customer_id character varying(200),
+    created_at date,
+    updated_at timestamp without time zone,
+    created_by character varying(200),
+    customer_name character varying(100),
+    customer_mail1 character varying(200),
+    customer_mail2 character varying(200),
+    customer_mail3 character varying(200),
+    customer_level character varying(100),
+    source character varying(200),
+    customer_country character varying(200),
+    note text,
+    customer_old_id character varying(200),
+    etl integer
+);
+
+
+ALTER TABLE etl.clean_customer OWNER TO postgres;
+
+--
+-- Name: clean_deadline; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.clean_deadline (
+    id uuid,
+    order_id text,
+    updated_at timestamp without time zone,
+    deadline timestamp without time zone,
+    timezone text,
+    etl integer DEFAULT 0
+);
+
+
+ALTER TABLE etl.clean_deadline OWNER TO postgres;
+
+--
+-- Name: clean_old_order; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.clean_old_order (
+    id uuid,
+    order_id text,
+    order_parent_id text,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    customer_id text,
+    col_1 text,
+    order_source text,
+    customer_mail text,
+    created_by text,
+    col_3 text,
+    col_4 text,
+    customer_level text,
+    exercise_type text,
+    subject text,
+    content text,
+    deadline timestamp without time zone,
+    total_amount real,
+    order_currency text,
+    discount_percentage real,
+    discount_amount double precision,
+    paid_amount real,
+    is_payment text,
+    transaction_id text,
+    customer_paid_account text,
+    order_note text,
+    hr_id text,
+    creater_id text,
+    candidate_payment numeric,
+    candidate_currency text,
+    candidate_expected_payment numeric,
+    order_status text,
+    col_6 text,
+    col_7 text,
+    col_8 text,
+    check_status text,
+    refund_percentage numeric,
+    refund_amount numeric,
+    refund_currency text,
+    refund_reason text,
+    tip_amount real,
+    tip_currency text,
+    col_9 text,
+    col_10 text,
+    col_11 text,
+    payment_status text,
+    done_at timestamp without time zone,
+    note text
+);
+
+
+ALTER TABLE etl.clean_old_order OWNER TO postgres;
+
+--
+-- Name: clean_old_transaction; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.clean_old_transaction (
+    id text,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    order_parent_id text,
+    transaction_id text,
+    total_amount numeric,
+    payment_currency text,
+    transaction_cost numeric,
+    cost_currency text,
+    payment_methods text,
+    payment_account text,
+    payment_type text,
+    col1 text,
+    col2 text,
+    col3 text,
+    note text,
+    etl integer
+);
+
+
+ALTER TABLE etl.clean_old_transaction OWNER TO postgres;
+
+--
+-- Name: clean_orders; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.clean_orders (
+    id uuid,
+    order_id text,
+    order_parent_id text,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    customer_id text,
+    col_1 text,
+    col_2 text,
+    customer_mail text,
+    created_by text,
+    col_3 text,
+    col_4 text,
+    customer_level text,
+    exercise_type text,
+    subject text,
+    content text,
+    deadline text,
+    total_amount real,
+    order_currency text,
+    discount_percentage numeric,
+    discount_amount real,
+    paid_amount numeric,
+    is_payment text,
+    transaction_id text,
+    customer_paid_account text,
+    order_note text,
+    hr_id text,
+    creater_id text,
+    candidate_payment numeric,
+    candidate_currency text,
+    candidate_expected_payment numeric,
+    order_status text,
+    col_6 text,
+    col_7 text,
+    col_8 text,
+    check_status text,
+    refund_percentage numeric,
+    refund_amount double precision,
+    refund_currency text,
+    refund_reason text,
+    tip_amount numeric,
+    tip_currency text,
+    col_9 text,
+    col_10 text,
+    col_11 text,
+    payment_status text,
+    done_at timestamp without time zone,
+    note text,
+    etl integer
+);
+
+
+ALTER TABLE etl.clean_orders OWNER TO postgres;
+
+--
+-- Name: clean_petty_expenses; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.clean_petty_expenses (
+    clv_id text,
+    month text,
+    payment_at timestamp without time zone,
+    accounting_at timestamp without time zone,
+    month_cover numeric,
+    payment_by text,
+    spend numeric,
+    collect numeric,
+    currency text DEFAULT 'VND'::text,
+    detail text,
+    type text,
+    category text,
+    payment_id text,
+    backup text,
+    source text,
+    etl smallint DEFAULT 0,
+    id uuid
+);
+
+
+ALTER TABLE etl.clean_petty_expenses OWNER TO postgres;
+
+--
+-- Name: clean_salary; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.clean_salary (
+    month text,
+    stt text,
+    id text,
+    name text,
+    "position" text,
+    department text,
+    stk text,
+    bank text,
+    num_working_day numeric,
+    num_working_day_standard numeric,
+    sales_salary numeric,
+    ot_salary numeric,
+    advance_salary numeric,
+    fines numeric,
+    bonus numeric,
+    basic_salary numeric,
+    allowance numeric,
+    hard_salary numeric,
+    time_salary numeric,
+    final_salary numeric,
+    backup text,
+    etl integer,
+    gen_id uuid,
+    updated_time timestamp without time zone
+);
+
+
+ALTER TABLE etl.clean_salary OWNER TO postgres;
+
+--
+-- Name: clean_timezone; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.clean_timezone (
+    locate character varying(20),
+    num numeric
+);
+
+
+ALTER TABLE etl.clean_timezone OWNER TO postgres;
+
+--
+-- Name: clean_transaction; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.clean_transaction (
+    default_id uuid,
+    id text,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    order_parent_id character varying(100),
+    transaction_id character varying(100),
+    total_amount numeric,
+    payment_currency character varying(100),
+    transaction_cost numeric,
+    cost_currency character varying(100),
+    payment_methods character varying,
+    payment_account character varying(200),
+    payment_type character varying(200),
+    col1 text,
+    col2 text,
+    col3 text,
+    note text,
+    etl integer
+);
+
+
+ALTER TABLE etl.clean_transaction OWNER TO postgres;
+
+--
+-- Name: clean_vps_backlink; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.clean_vps_backlink (
+    month text,
+    vps numeric,
+    backlink numeric,
+    vps_tien_dat numeric,
+    vps_tien_go numeric,
+    vps_tien_dat_gop numeric,
+    vps_tien_go_gop numeric,
+    backlink_tien_dat numeric,
+    backlink_tien_go numeric,
+    backlink_tien_dat_gop numeric,
+    backlink_tien_go_gop numeric,
+    etl smallint DEFAULT 0,
+    id uuid,
+    updatetime timestamp without time zone
+);
+
+
+ALTER TABLE etl.clean_vps_backlink OWNER TO postgres;
+
+--
+-- Name: default_creater; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.default_creater (
+    "Mã HR" text,
+    "ID" text,
+    "STK" text,
+    "Ngân hàng" text,
+    "Email" text,
+    "Họ tên" text,
+    "Năm sinh" text,
+    "Nơi đang học" text,
+    "Điểm viết Ielts hoặc tương đương" text,
+    "Lĩnh vực" text,
+    "Số bài đã nhận" text,
+    "Số tiền đã nhận" text,
+    "Doanh thu tạo ra" text,
+    "Số bài refund" text,
+    "Số tiền refund" text,
+    "CV/bảng điểm + sample" text,
+    "Tình trạng" text,
+    "Ghi chú" text,
+    "Đánh giá" text,
+    "Mã hóa" text,
+    updated_at text,
+    "ID người làm" text,
+    etl smallint DEFAULT 0,
+    id uuid DEFAULT public.uuid_generate_v4()
+);
+
+
+ALTER TABLE etl.default_creater OWNER TO postgres;
+
+--
+-- Name: default_creaters2; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.default_creaters2 (
+    created_at text,
+    hr text,
+    short_name text,
+    name text,
+    phone text,
+    study_at text,
+    ielts_score text,
+    fields text,
+    cv text,
+    esay text,
+    hours_active text,
+    hours_note text,
+    note text,
+    check_status text,
+    status text,
+    updated_at text,
+    long_name text,
+    id text,
+    etl smallint DEFAULT 0,
+    db_id uuid DEFAULT public.uuid_generate_v4()
+);
+
+
+ALTER TABLE etl.default_creaters2 OWNER TO postgres;
+
+--
+-- Name: default_customer; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.default_customer (
+    "Ngày nhập" character varying(200),
+    "ID khách" character varying(200),
+    "Mail1" character varying(200),
+    "Mail2" character varying(200),
+    "Mail3" character varying(200),
+    "Mã nhân viên chốt" character varying(200),
+    "Tên Họ" character varying(100),
+    "Trình độ" character varying(100),
+    "Nguồn" character varying(200),
+    "Quốc gia" character varying(200),
+    "Note" text,
+    "Mã khách hàng cũ" character varying(200),
+    updated_at character varying(200),
+    etl smallint DEFAULT 0,
+    id uuid DEFAULT public.uuid_generate_v4()
+);
+
+
+ALTER TABLE etl.default_customer OWNER TO postgres;
+
+--
+-- Name: default_old_order; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.default_old_order (
+    "Mã đơn" text,
+    "Mã đơn bố" text,
+    "Ngày nhập" text,
+    "ID khách" text,
+    col_1 text,
+    col_2 text,
+    "Mail khách hàng" text,
+    "Mã người chốt" text,
+    col_3 text,
+    col_4 text,
+    "Trình độ" text,
+    "Loại bài tập" text,
+    "Môn" text,
+    "Đề bài" text,
+    "Deadline" text,
+    "Giá trị đơn hàng" text,
+    "Đơn vị (đơn hàng)" text,
+    "Giảm giá" text,
+    "Đã thanh toán" text,
+    "Trans ID" text,
+    "Tài khoản thanh toán" text,
+    "Ghi chú khác" text,
+    "Mã HR" text,
+    "Mã người làm" text,
+    "Tiền trả ứng viên" text,
+    "Đơn vị (trả ứng viên)" text,
+    "Dự kiến trả ứng viên" text,
+    "Tình trạng đơn" text,
+    col_6 text,
+    col_7 text,
+    col_8 text,
+    "Gửi check" text,
+    "%refund" text,
+    "Đơn vị refund" text,
+    "Lý do refund" text,
+    "Tip" text,
+    "Đơn vị tip" text,
+    col_9 text,
+    col_10 text,
+    col_11 text,
+    "Tình trạng thanh toán" text,
+    "Ngày giờ xong" text,
+    "Note" text,
+    updated_at text,
+    etl smallint DEFAULT 0,
+    id uuid DEFAULT public.uuid_generate_v4()
+);
+
+
+ALTER TABLE etl.default_old_order OWNER TO postgres;
+
+--
+-- Name: default_old_transaction; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.default_old_transaction (
+    id text,
+    created_at text,
+    transaction_id text,
+    total_amount text,
+    payment_currency text,
+    transaction_cost text,
+    cost_currency text,
+    payment_methods text,
+    payment_account text,
+    col1 text,
+    col2 text,
+    col3 text,
+    order_parent_id text,
+    payment_type text,
+    note text,
+    updated_at text
+);
+
+
+ALTER TABLE etl.default_old_transaction OWNER TO postgres;
+
+--
+-- Name: default_order; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.default_order (
+    "Mã đơn" text,
+    "Mã đơn bố" text,
+    "Ngày nhập" text,
+    "ID khách" text,
+    col_1 text,
+    col_2 text,
+    "Mail khách hàng" text,
+    "Mã người chốt" text,
+    col_3 text,
+    col_4 text,
+    "Trình độ" text,
+    "Loại bài tập" text,
+    "Môn" text,
+    "Đề bài" text,
+    "Deadline" text,
+    "Giá trị đơn hàng" text,
+    "Đơn vị (đơn hàng)" text,
+    "Giảm giá" text,
+    "Đã thanh toán" text,
+    "Trans ID" text,
+    "Tài khoản thanh toán" text,
+    "Ghi chú khác" text,
+    "Mã HR" text,
+    "Mã người làm" text,
+    "Tiền trả ứng viên" text,
+    "Đơn vị (trả ứng viên)" text,
+    "Dự kiến trả ứng viên" text,
+    "Tình trạng đơn" text,
+    col_6 text,
+    col_7 text,
+    col_8 text,
+    "Gửi check" text,
+    "%refund" text,
+    "Đơn vị refund" text,
+    "Lý do refund" text,
+    "Tip" text,
+    "Đơn vị tip" text,
+    col_9 text,
+    col_10 text,
+    col_11 text,
+    "Tình trạng thanh toán" text,
+    "Ngày giờ xong" text,
+    "Note" text,
+    updated_at text,
+    etl smallint DEFAULT 0,
+    id uuid DEFAULT public.uuid_generate_v4()
+);
+
+
+ALTER TABLE etl.default_order OWNER TO postgres;
+
+--
+-- Name: default_petty_expenses; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.default_petty_expenses (
+    clv_id text,
+    month text,
+    payment_at text,
+    accounting_at text,
+    month_cover text,
+    payment_by text,
+    spend text,
+    collect text,
+    detail text,
+    type text,
+    category text,
+    payment_id text,
+    backup text,
+    source text,
+    etl smallint DEFAULT 0,
+    id uuid DEFAULT public.uuid_generate_v4()
+);
+
+
+ALTER TABLE etl.default_petty_expenses OWNER TO postgres;
+
+--
+-- Name: default_salary; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.default_salary (
+    month text,
+    stt text,
+    id text,
+    name text,
+    "position" text,
+    department text,
+    stk text,
+    bank text,
+    num_working_day text,
+    num_working_day_standard text,
+    sales_salary text,
+    ot_salary text,
+    advance_salary text,
+    fines text,
+    bonus text,
+    basic_salary text,
+    allowance text,
+    hard_salary text,
+    time_salary text,
+    final_salary text,
+    backup text,
+    etl smallint DEFAULT 0,
+    gen_id uuid DEFAULT public.uuid_generate_v4(),
+    updated_time timestamp without time zone DEFAULT (now() AT TIME ZONE 'utc'::text)
+);
+
+
+ALTER TABLE etl.default_salary OWNER TO postgres;
+
+--
+-- Name: default_transaction; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.default_transaction (
+    id text,
+    created_at character varying(100),
+    transaction_id character varying(100),
+    total_amount character varying(100),
+    payment_currency character varying(100),
+    transaction_cost character varying(100),
+    cost_currency character varying(100),
+    payment_methods character varying(100),
+    payment_account character varying(200),
+    col1 text,
+    col2 text,
+    col3 text,
+    order_parent_id character varying(100),
+    payment_type character varying(200),
+    note text,
+    updated_at character varying(100),
+    default_id uuid DEFAULT public.uuid_generate_v4(),
+    etl smallint DEFAULT 0
+);
+
+
+ALTER TABLE etl.default_transaction OWNER TO postgres;
+
+--
+-- Name: default_vps_backlink; Type: TABLE; Schema: etl; Owner: postgres
+--
+
+CREATE TABLE etl.default_vps_backlink (
+    month text,
+    vps text,
+    backlink text,
+    vps_tien_dat text,
+    vps_tien_go text,
+    vps_tien_dat_gop text,
+    vps_tien_go_gop text,
+    backlink_tien_dat text,
+    backlink_tien_go text,
+    backlink_tien_dat_gop text,
+    backlink_tien_go_gop text,
+    etl smallint DEFAULT 0,
+    id uuid DEFAULT public.uuid_generate_v4(),
+    updatetime timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE etl.default_vps_backlink OWNER TO postgres;
+
+--
+-- Name: etl_clean_customer; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.etl_clean_customer (
+    id uuid,
+    "ID khách" character varying(200),
+    "case" date,
+    to_timestamp timestamp without time zone,
+    "Mã nhân viên chốt" character varying(200),
+    "Tên Họ" character varying(100),
+    "Mail1" character varying(200),
+    "Mail2" character varying(200),
+    "Mail3" character varying(200),
+    "Trình độ" character varying(100),
+    "Nguồn" character varying(200),
+    "Quốc gia" character varying(200),
+    "Note" text,
+    "Mã khách hàng cũ" character varying(200),
+    etl integer
+);
+
+
+ALTER TABLE public.etl_clean_customer OWNER TO postgres;
+
+--
+-- Data for Name: bu; Type: TABLE DATA; Schema: data; Owner: postgres
+--
